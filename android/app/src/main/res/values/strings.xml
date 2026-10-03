@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ayaan</string>
+    <string name="title_activity_main">Ayaan</string>
+    <string name="package_name">com.ayaan.solarworkshop</string>
+    <string name="custom_url_scheme">com.ayaan.solarworkshop</string>
+</resources>

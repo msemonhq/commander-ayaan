@@ -1,0 +1,95 @@
+{
+  "app": {
+    "title": "Commander Ayaan",
+    "boot_cta": "Tap to Start",
+    "mute": "Mute sound",
+    "unmute": "Turn on sound",
+    "home": "Go to Mission Control",
+    "back": "Back",
+    "not_to_scale": "Not to scale"
+  },
+  "hub": {
+    "title": "Mission Control",
+    "meet_door": "Meet the Planets",
+    "parade_door": "Planet Parade",
+    "orbi_greeting": "Welcome back, Commander Ayaan!"
+  },
+  "meet": {
+    "title": "Meet the Planets",
+    "instruction": "Tap any planet to explore!",
+    "more_fact_button": "Tell me more"
+  },
+  "parade": {
+    "title": "Planet Parade",
+    "instruction": "Put planets in order from the Sun!",
+    "r1_prompt": "Place the first three planets!",
+    "r2_prompt": "Line up four planets!",
+    "r3_prompt": "Who lives in this empty spot?",
+    "r4_prompt": "Six planets ready for launch!",
+    "r5_prompt": "Build the grand parade!",
+    "round_complete": "Great job, Commander!",
+    "mission_complete": "Mission Complete! You earned three stars!",
+    "next_button": "Next Round",
+    "finish_button": "Return to Hub"
+  },
+  "hints": {
+    "level1": "Let's look again together.",
+    "level2": "Watch the gentle glowing home.",
+    "level3": "Let's put this one together!"
+  },
+  "praise": {
+    "line1": "Star-bright thinking, Commander!",
+    "line2": "You found their home!",
+    "line3": "Wonderful work in space!",
+    "line4": "The solar system shines bright!",
+    "line5": "You are a stellar explorer!",
+    "line6": "High five, Commander Ayaan!"
+  },
+  "planet": {
+    "sun": {
+      "name": "Sun",
+      "fact1": "The Sun is a star. Over one million Earths fit inside!",
+      "fact2": "The Sun holds almost all mass in our solar system!"
+    },
+    "mercury": {
+      "name": "Mercury",
+      "fact1": "Mercury is the smallest planet and closest to the Sun!",
+      "fact2": "A year on Mercury is only eighty-eight Earth days!"
+    },
+    "venus": {
+      "name": "Venus",
+      "fact1": "Venus spins backwards compared to most other planets!",
+      "fact2": "Venus is the hottest planet because thick air traps heat!"
+    },
+    "earth": {
+      "name": "Earth",
+      "fact1": "Earth is our home and the only known place with life!",
+      "fact2": "Earth has one Moon that travels around it every month!"
+    },
+    "mars": {
+      "name": "Mars",
+      "fact1": "Mars looks red because of rusty iron dust on its ground!",
+      "fact2": "Mars has the biggest volcano in the whole solar system!"
+    },
+    "jupiter": {
+      "name": "Jupiter",
+      "fact1": "Jupiter is the biggest planet of all!",
+      "fact2": "Jupiter has a giant red storm that has raged for centuries!"
+    },
+    "saturn": {
+      "name": "Saturn",
+      "fact1": "Saturn has huge, bright rings made of ice and rock!",
+      "fact2": "Saturn is so light it could float in water!"
+    },
+    "uranus": {
+      "name": "Uranus",
+      "fact1": "Uranus rolls on its side as it circles the Sun!",
+      "fact2": "Uranus is a giant ice ball with faint rings!"
+    },
+    "neptune": {
+      "name": "Neptune",
+      "fact1": "Neptune is the farthest planet from the Sun!",
+      "fact2": "Neptune is deep blue and has the fastest winds!"
+    }
+  }
+}

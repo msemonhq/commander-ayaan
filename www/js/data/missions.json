@@ -1,0 +1,42 @@
+{
+  "parade": {
+    "rounds_per_mission": 5,
+    "rungs": {
+      "1": {
+        "id": 1,
+        "description": "Inner trio with dot numbering (Mercury, Venus, Earth)",
+        "planets": ["mercury", "venus", "earth"],
+        "show_dots": true,
+        "mode": "all"
+      },
+      "2": {
+        "id": 2,
+        "description": "Inner four without dots (Mercury to Mars)",
+        "planets": ["mercury", "venus", "earth", "mars"],
+        "show_dots": false,
+        "mode": "all"
+      },
+      "3": {
+        "id": 3,
+        "description": "Who lives here? Missing neighbor between two placed planets",
+        "show_dots": false,
+        "mode": "gap",
+        "candidate_pool_size": 3
+      },
+      "4": {
+        "id": 4,
+        "description": "Six planets (Mercury to Saturn)",
+        "planets": ["mercury", "venus", "earth", "mars", "jupiter", "saturn"],
+        "show_dots": false,
+        "mode": "all"
+      },
+      "5": {
+        "id": 5,
+        "description": "All eight planets with two-chapter inner/outer runway progression",
+        "planets": ["mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"],
+        "show_dots": false,
+        "mode": "chapters"
+      }
+    }
+  }
+}
