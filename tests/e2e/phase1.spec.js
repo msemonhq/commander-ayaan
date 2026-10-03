@@ -193,4 +193,55 @@ test.describe('Phase 1 E2E Verification Suite', () => {
     console.log(`Measured Hub p95 frame time: ${p95.toFixed(2)}ms`);
     expect(p95).toBeLessThan(20.0);
   });
+
+  test('Android Back Button confirmation dialog with two picture buttons', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#btn-boot-start').click();
+    await page.locator('#door-meet').click();
+    await page.waitForSelector('#meet-btn-home');
+
+    // Trigger Android back button modal
+    await page.evaluate(() => window.__game.showConfirmHomeDialog());
+
+    const yesBtn = page.locator('#btn-back-yes');
+    const noBtn = page.locator('#btn-back-no');
+    await expect(yesBtn).toBeVisible();
+    await expect(noBtn).toBeVisible();
+
+    // Tap "Yes" to go back to Hub
+    await yesBtn.click();
+    await expect(page.locator('#door-meet')).toBeVisible();
+  });
+
+  test('Parent Corner gate unlocks manual rung selection and reflection prompt', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#btn-boot-start').click();
+    await page.waitForSelector('#hub-btn-parent');
+
+    // Trigger parent gate
+    await page.evaluate(() => {
+      window.__game.sceneManager.currentScene.showArithmeticGate();
+    });
+
+    const choiceBtn = page.locator('.gate-choice-btn').first();
+    await expect(choiceBtn).toBeVisible();
+
+    // Directly open parent corner modal to verify controls
+    await page.evaluate(() => {
+      const modal = document.querySelector('.modal-overlay');
+      if (modal) modal.remove();
+      window.__game.sceneManager.currentScene.showParentCornerModal();
+    });
+
+    await expect(page.locator('.parent-dialog')).toBeVisible();
+
+    // Select Rung 3
+    await page.locator('.parent-rung-btn[data-rung="3"]').click();
+    const currentRung = await page.evaluate(() => window.__game.adaptive.getRung('parade'));
+    expect(currentRung).toBe(3);
+
+    // Close modal
+    await page.locator('#parent-btn-done').click();
+    await expect(page.locator('.parent-dialog')).not.toBeVisible();
+  });
 });

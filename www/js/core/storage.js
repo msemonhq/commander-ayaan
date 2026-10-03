@@ -29,6 +29,10 @@ const DEFAULT_STATE = {
   sessionLog: []
 };
 
+function getDefaultState() {
+  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+
 class StorageSystem {
   constructor() {
     this.state = this.load();
@@ -37,15 +41,27 @@ class StorageSystem {
   load() {
     try {
       if (typeof localStorage === 'undefined') {
-        return { ...DEFAULT_STATE };
+        return getDefaultState();
       }
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return { ...DEFAULT_STATE };
+      if (!raw) return getDefaultState();
       const parsed = JSON.parse(raw);
-      return { ...DEFAULT_STATE, ...parsed };
+      const defaults = getDefaultState();
+      return {
+        ...defaults,
+        ...parsed,
+        profile: { ...defaults.profile, ...(parsed.profile || {}) },
+        modes: {
+          ...defaults.modes,
+          parade: { ...defaults.modes.parade, ...(parsed.modes?.parade || {}) },
+          meet: { ...defaults.modes.meet, ...(parsed.modes?.meet || {}) }
+        },
+        passport: { ...defaults.passport, ...(parsed.passport || {}) },
+        sessionLog: Array.isArray(parsed.sessionLog) ? parsed.sessionLog : defaults.sessionLog
+      };
     } catch (err) {
       console.warn('Storage read failed, falling back to default:', err);
-      return { ...DEFAULT_STATE };
+      return getDefaultState();
     }
   }
 
@@ -92,7 +108,7 @@ class StorageSystem {
   }
 
   reset() {
-    this.state = { ...DEFAULT_STATE };
+    this.state = getDefaultState();
     this.save();
   }
 }

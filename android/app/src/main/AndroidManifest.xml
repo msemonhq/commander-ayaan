@@ -35,7 +35,5 @@
         </provider>
     </application>
 
-    <!-- Permissions -->
-
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Permissions (Pure 100% Offline App: zero network permissions) -->
 </manifest>

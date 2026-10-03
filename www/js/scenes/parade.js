@@ -32,6 +32,9 @@ export class ParadeScene {
     this.isRoundOver = false;
     this.activeRung = 1;
     this.chapter = 1; // for Rung 5
+    this.activeTimeouts = [];
+    this.isExited = false;
+    this.isAutoSolving = false;
   }
 
   setPlanets(planetsData) {
@@ -42,13 +45,34 @@ export class ParadeScene {
     this.missions = missionsData;
   }
 
+  safeTimeout(fn, ms) {
+    const timer = setTimeout(() => {
+      this.activeTimeouts = this.activeTimeouts.filter(t => t !== timer);
+      if (this.isExited) return;
+      fn();
+    }, ms);
+    this.activeTimeouts.push(timer);
+    return timer;
+  }
+
+  clearTimeouts() {
+    for (const t of this.activeTimeouts) {
+      clearTimeout(t);
+    }
+    this.activeTimeouts = [];
+  }
+
   enter() {
+    this.isExited = false;
+    this.isAutoSolving = false;
     this.currentRound = 1;
     this.activeRung = adaptive.getRung('parade');
     this.startRound();
   }
 
   exit() {
+    this.isExited = true;
+    this.clearTimeouts();
     hints.reset();
   }
 
@@ -215,13 +239,61 @@ export class ParadeScene {
       this.buildUI();
     });
 
-    // Bind Tray items (Tap to select)
+    // Bind Tray items (Drag or Tap to select/place)
     for (const id of this.trayPlanets) {
       const el = document.getElementById(`tray-item-${id}`);
       if (el) {
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.handleTrayTap(id);
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+
+        const onPointerMove = (e) => {
+          if (this.isRoundOver || this.isAutoSolving) return;
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          if (!isDragging && Math.hypot(dx, dy) > 10) {
+            isDragging = true;
+            this.selectedTrayPlanet = id;
+            el.classList.add('selected');
+          }
+          if (isDragging) {
+            const hitEl = document.elementFromPoint(e.clientX, e.clientY);
+            const targetSlot = hitEl ? hitEl.closest('.runway-slot') : null;
+            document.querySelectorAll('.runway-slot').forEach(s => s.classList.remove('target-highlight'));
+            if (targetSlot && !targetSlot.classList.contains('filled')) {
+              targetSlot.classList.add('target-highlight');
+            }
+          }
+        };
+
+        const onPointerUp = (e) => {
+          window.removeEventListener('pointermove', onPointerMove);
+          window.removeEventListener('pointerup', onPointerUp);
+          document.querySelectorAll('.runway-slot').forEach(s => s.classList.remove('target-highlight'));
+
+          if (isDragging) {
+            isDragging = false;
+            const hitEl = document.elementFromPoint(e.clientX, e.clientY);
+            const targetSlot = hitEl ? hitEl.closest('.runway-slot') : null;
+            if (targetSlot) {
+              const slotIdx = parseInt(targetSlot.dataset.slotIndex, 10);
+              if (!isNaN(slotIdx)) {
+                this.handleSlotTap(slotIdx);
+                return;
+              }
+            }
+          } else {
+            this.handleTrayTap(id);
+          }
+        };
+
+        el.addEventListener('pointerdown', (e) => {
+          if (this.isRoundOver || this.isAutoSolving) return;
+          startX = e.clientX;
+          startY = e.clientY;
+          isDragging = false;
+          window.addEventListener('pointermove', onPointerMove);
+          window.addEventListener('pointerup', onPointerUp);
         });
       }
     }
@@ -244,14 +316,14 @@ export class ParadeScene {
   }
 
   handleTrayTap(planetId) {
-    if (this.isRoundOver) return;
+    if (this.isRoundOver || this.isAutoSolving) return;
     this.selectedTrayPlanet = planetId;
     audio.playPop();
     this.buildUI();
   }
 
   handleSlotTap(slotIndex) {
-    if (this.isRoundOver || !this.selectedTrayPlanet) return;
+    if (this.isRoundOver || this.isAutoSolving || !this.selectedTrayPlanet) return;
     if (this.placedPlanets.has(slotIndex)) return; // Already placed
 
     const slot = this.slots[slotIndex];
@@ -282,20 +354,23 @@ export class ParadeScene {
     } else {
       // Miss! Gentle hint ladder
       this.hintsInRound += 1;
+      const expectedPlanetId = slot.id;
+      const expectedSlotIndex = this.slots.findIndex(s => s.id === candidateId);
+
       const hintResult = hints.handleMiss({
         targetId: candidateId,
-        correctSlotId: this.slots.findIndex(s => s.id === candidateId)
+        correctSlotId: expectedSlotIndex >= 0 ? expectedSlotIndex : slotIndex
       });
 
       // Wobble animation on tray item
       const trayEl = document.getElementById(`tray-item-${candidateId}`);
       if (trayEl) {
         trayEl.classList.add('wobble-boop');
-        setTimeout(() => trayEl.classList.remove('wobble-boop'), 400);
+        this.safeTimeout(() => trayEl?.classList.remove('wobble-boop'), 400);
       }
 
-      if (hintResult.glowTarget && hintResult.correctSlotId >= 0) {
-        const targetSlotEl = document.getElementById(`slot-${hintResult.correctSlotId}`);
+      if (hintResult.glowTarget) {
+        const targetSlotEl = document.getElementById(`slot-${slotIndex}`);
         if (targetSlotEl) {
           targetSlotEl.classList.add('glow-hint');
         }
@@ -303,10 +378,14 @@ export class ParadeScene {
 
       if (hintResult.autoSolve) {
         // Miss 3: Orbi co-play auto-placement
-        setTimeout(() => {
-          this.placedPlanets.set(hintResult.correctSlotId, candidateId);
-          this.trayPlanets = this.trayPlanets.filter(id => id !== candidateId);
+        this.isAutoSolving = true;
+        this.safeTimeout(() => {
+          if (this.isExited) return;
+          // Place the correct expected planet into this slot
+          this.placedPlanets.set(slotIndex, expectedPlanetId);
+          this.trayPlanets = this.trayPlanets.filter(id => id !== expectedPlanetId);
           this.selectedTrayPlanet = null;
+          this.isAutoSolving = false;
           rewards.triggerMicro();
           this.buildUI();
           this.checkRoundCompletion();
@@ -329,7 +408,8 @@ export class ParadeScene {
     // Tier 2 round celebration (<= 1.5s)
     const earnedStars = rewards.triggerRoundComplete(this.hintsInRound);
 
-    setTimeout(() => {
+    this.safeTimeout(() => {
+      if (this.isExited) return;
       if (this.currentRound >= this.totalRounds) {
         this.finishMission();
       } else {

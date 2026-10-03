@@ -1,4 +1,11 @@
-/* Design Tokens for Commander Ayaan: Paper-cut Planetarium */
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('../assets/fonts/nunito.woff2') format('woff2');
+}
+
 :root {
   /* Celestial Palette */
   --space-dark: #0A0D24;
@@ -28,8 +35,8 @@
   --radius-sm: 8px;
   
   /* Typography */
-  --font-display: "Baloo 2", "Nunito", "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-body: "Nunito", "Instrument Sans", system-ui, -apple-system, sans-serif;
+  --font-display: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: "Nunito", system-ui, -apple-system, sans-serif;
   
   --fs-title: clamp(2rem, 5.5vw, 2.75rem);
   --fs-heading: clamp(1.4rem, 4vw, 1.9rem);

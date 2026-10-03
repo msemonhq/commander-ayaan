@@ -12,6 +12,8 @@ import { spriteCache } from '../render/sprites.js';
 import { calculateOrbitPosition } from '../sim/orbits.js';
 import { audio } from '../core/audio.js';
 import { i18n } from '../core/i18n.js';
+import { storage } from '../core/storage.js';
+import { adaptive } from '../systems/adaptive.js';
 import { InputManager } from '../core/input.js';
 
 export class HubScene {
@@ -45,6 +47,9 @@ export class HubScene {
           <span class="scale-badge">${i18n.t('hub.title')}</span>
         </div>
         <div class="top-bar-right">
+          <button id="hub-btn-parent" class="btn-icon" aria-label="${i18n.t('app.parent_gate_button')}" title="${i18n.t('app.parent_gate_button')}">
+            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+          </button>
           <button id="hub-btn-mute" class="btn-icon" aria-label="${audio.isMuted ? i18n.t('app.unmute') : i18n.t('app.mute')}">
             <svg viewBox="0 0 24 24">
               ${audio.isMuted 
@@ -88,6 +93,140 @@ export class HubScene {
     muteBtn.addEventListener('click', () => {
       audio.toggleMute();
       this.buildUI();
+    });
+
+    // Parent Gate 3-second hold listener
+    const parentBtn = document.getElementById('hub-btn-parent');
+    let holdTimer = null;
+
+    const startHold = () => {
+      parentBtn.classList.add('holding');
+      holdTimer = setTimeout(() => {
+        parentBtn.classList.remove('holding');
+        audio.playPop();
+        this.showArithmeticGate();
+      }, 3000);
+    };
+
+    const cancelHold = () => {
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+        parentBtn.classList.remove('holding');
+      }
+    };
+
+    parentBtn.addEventListener('pointerdown', startHold);
+    parentBtn.addEventListener('pointerup', cancelHold);
+    parentBtn.addEventListener('pointerleave', cancelHold);
+    parentBtn.addEventListener('pointercancel', cancelHold);
+  }
+
+  showArithmeticGate() {
+    const a = Math.floor(Math.random() * 5) + 2;
+    const b = Math.floor(Math.random() * 4) + 1;
+    const sum = a + b;
+    const choices = [sum, sum - 1, sum + 2].sort(() => Math.random() - 0.5);
+
+    const overlay = this.sceneManager.uiOverlay;
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="confirm-home-dialog">
+        <div class="confirm-home-title">${i18n.t('app.parent_gate_title')}</div>
+        <p style="color:var(--ink-secondary); font-size:1.15rem;">${i18n.t('app.parent_gate_prompt', { a, b })}</p>
+        <div class="gate-choices-row">
+          ${choices.map(c => `<button class="gate-choice-btn" data-val="${c}">${c}</button>`).join('')}
+        </div>
+        <button id="gate-btn-cancel" class="btn-primary" style="margin-top:12px; font-size:1rem; min-height:48px;">${i18n.t('app.close')}</button>
+      </div>
+    `;
+    overlay.appendChild(modal);
+
+    modal.querySelectorAll('.gate-choice-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = parseInt(btn.dataset.val, 10);
+        if (val === sum) {
+          audio.playPop();
+          modal.remove();
+          this.showParentCornerModal();
+        } else {
+          audio.playBoop();
+          btn.style.borderColor = '#FF7043';
+          setTimeout(() => {
+            modal.remove();
+            this.showArithmeticGate();
+          }, 350);
+        }
+      });
+    });
+
+    document.getElementById('gate-btn-cancel')?.addEventListener('click', () => {
+      modal.remove();
+    });
+  }
+
+  showParentCornerModal() {
+    const overlay = this.sceneManager.uiOverlay;
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+
+    const currentRung = adaptive.getRung('parade');
+    const reduceMotion = storage.get('profile.reduceMotion', false);
+
+    modal.innerHTML = `
+      <div class="parent-dialog">
+        <h2>${i18n.t('app.parent_corner_title')}</h2>
+        
+        <div class="parent-card-box">
+          <strong>${i18n.t('app.parent_open_question_title')}</strong>
+          <p style="font-size:0.95rem; color:#FFFFFF;">"${i18n.t('app.parent_open_question')}"</p>
+        </div>
+
+        <div class="parent-card-box">
+          <strong>${i18n.t('app.parent_closing_reflection')}</strong>
+        </div>
+
+        <div class="parent-card-box">
+          <strong>${i18n.t('app.parent_parade_rung')}:</strong>
+          <div class="parent-rungs-row">
+            ${[1, 2, 3, 4, 5].map(r => `
+              <button class="parent-rung-btn ${r === currentRung ? 'active' : ''}" data-rung="${r}">${r}</button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="parent-card-box" style="flex-direction:row; justify-content:space-between; align-items:center;">
+          <span>${i18n.t('app.parent_reduce_motion')}</span>
+          <input type="checkbox" id="chk-reduce-motion" ${reduceMotion ? 'checked' : ''} style="width:24px; height:24px; cursor:pointer;" />
+        </div>
+
+        <button id="parent-btn-done" class="btn-primary" style="margin-top:8px;">${i18n.t('app.close')}</button>
+      </div>
+    `;
+
+    overlay.appendChild(modal);
+
+    modal.querySelectorAll('.parent-rung-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const r = parseInt(btn.dataset.rung, 10);
+        adaptive.setRung('parade', r);
+        modal.querySelectorAll('.parent-rung-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        audio.playPop();
+      });
+    });
+
+    const chkMotion = document.getElementById('chk-reduce-motion');
+    if (chkMotion) {
+      chkMotion.addEventListener('change', (e) => {
+        storage.set('profile.reduceMotion', e.target.checked);
+      });
+    }
+
+    document.getElementById('parent-btn-done')?.addEventListener('click', () => {
+      audio.playPop();
+      modal.remove();
     });
   }
 

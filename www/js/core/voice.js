@@ -44,8 +44,26 @@ class VoiceSystem {
       }
     }
 
-    // Step 2: In Phase 1, subtitles + subtle Orbi chirp sound are standard.
-    // Web Speech API / TTS is wired for readiness.
+    // Step 2: Text-to-speech fallback (Web Speech API)
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.95;
+        utterance.pitch = 1.25; // Warm, friendly robotic pitch
+        utterance.lang = (i18n.currentLang === 'bn') ? 'bn-BD' : 'en-US';
+        utterance.onend = () => this.handleFinished();
+        utterance.onerror = () => this.handleFinished();
+        window.speechSynthesis.speak(utterance);
+
+        audio.playTone(520, 0.08, 'sine');
+        return;
+      } catch (err) {
+        console.warn('TTS speech synthesis unavailable:', err);
+      }
+    }
+
+    // Step 3: Subtitle-only fallback with subtle Orbi chirp sound
     audio.playTone(520, 0.12, 'sine');
 
     // Auto-advance subtitles after reading time: ~200ms per word, min 2.5s
@@ -84,6 +102,11 @@ class VoiceSystem {
   }
 
   stop() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
     if (this.autoAdvanceTimer) {
       clearTimeout(this.autoAdvanceTimer);
       this.autoAdvanceTimer = null;

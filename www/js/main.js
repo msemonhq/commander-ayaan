@@ -99,6 +99,102 @@ async function init() {
     }
   });
 
+  // Android Back Button Confirmation Modal ("Go home?" with two picture buttons)
+  function showConfirmHomeDialog() {
+    if (document.querySelector('.confirm-home-overlay')) return;
+    if (sceneManager.currentSceneName === 'boot' || sceneManager.currentSceneName === 'hub') return;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay confirm-home-overlay';
+    modal.innerHTML = `
+      <div class="confirm-home-dialog">
+        <div class="confirm-home-title">${i18n.t('app.confirm_home_title')}</div>
+        <div class="confirm-home-actions">
+          <button id="btn-back-yes" class="btn-picture-action btn-picture-yes" aria-label="${i18n.t('app.confirm_home_yes')}">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+            </svg>
+            <span>${i18n.t('app.confirm_home_yes')}</span>
+          </button>
+          <button id="btn-back-no" class="btn-picture-action btn-picture-no" aria-label="${i18n.t('app.confirm_home_no')}">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <span>${i18n.t('app.confirm_home_no')}</span>
+          </button>
+        </div>
+      </div>
+    `;
+    uiOverlay.appendChild(modal);
+
+    document.getElementById('btn-back-yes').addEventListener('click', () => {
+      audio.playPop();
+      modal.remove();
+      sceneManager.switch('hub');
+    });
+
+    document.getElementById('btn-back-no').addEventListener('click', () => {
+      audio.playPop();
+      modal.remove();
+    });
+  }
+
+  // Hook up Capacitor Back Button if running inside native app or keyboard/popstate
+  if (typeof window !== 'undefined') {
+    window.addEventListener('popstate', () => showConfirmHomeDialog());
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') showConfirmHomeDialog();
+    });
+
+    try {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+        window.Capacitor.Plugins.App.addListener('backButton', () => showConfirmHomeDialog());
+      }
+    } catch {}
+  }
+
+  // Session Pacing Reminder: "Orbi needs a rest"
+  function showRestNeededDialog() {
+    if (document.querySelector('.rest-dialog-overlay')) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay rest-dialog-overlay';
+    modal.innerHTML = `
+      <div class="confirm-home-dialog" style="max-width:460px;">
+        <div class="confirm-home-title">${i18n.t('app.rest_title')}</div>
+        <p style="color:var(--ink-secondary); font-size:1.1rem; line-height:1.4;">${i18n.t('app.rest_message')}</p>
+        <div class="confirm-home-actions">
+          <button id="btn-rest-stop" class="btn-picture-action btn-picture-yes" aria-label="${i18n.t('app.rest_finish')}">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+            </svg>
+            <span>${i18n.t('app.rest_finish')}</span>
+          </button>
+          <button id="btn-rest-continue" class="btn-picture-action btn-picture-no" aria-label="${i18n.t('app.rest_continue')}">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <span>${i18n.t('app.rest_continue')}</span>
+          </button>
+        </div>
+      </div>
+    `;
+    uiOverlay.appendChild(modal);
+
+    document.getElementById('btn-rest-stop').addEventListener('click', () => {
+      audio.playPop();
+      modal.remove();
+      sceneManager.switch('hub');
+    });
+
+    document.getElementById('btn-rest-continue').addEventListener('click', () => {
+      audio.playPop();
+      modal.remove();
+    });
+  }
+
+  events.on('session:rest_needed', () => showRestNeededDialog());
+
   // Game Loop
   const loop = new GameLoop(
     (dt) => {
@@ -132,7 +228,9 @@ async function init() {
     planetsData,
     switchScene: (name, params) => sceneManager.switch(name, params),
     getCurrentScene: () => sceneManager.currentSceneName,
-    getP95FrameTime: () => loop.getP95FrameTime()
+    getP95FrameTime: () => loop.getP95FrameTime(),
+    showConfirmHomeDialog,
+    showRestNeededDialog
   };
 
   console.log('Commander Ayaan initialized successfully.');
