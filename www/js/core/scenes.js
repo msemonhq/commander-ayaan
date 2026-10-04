@@ -73,6 +73,13 @@ export class SceneManager {
     return false;
   }
 
+  handleHoldEnd(point) {
+    if (this.currentScene && this.currentScene.handleHoldEnd) {
+      return this.currentScene.handleHoldEnd(point);
+    }
+    return false;
+  }
+
   handleDragStart(dragInfo) {
     if (this.currentScene && this.currentScene.handleDragStart) {
       return this.currentScene.handleDragStart(dragInfo);
@@ -81,8 +88,9 @@ export class SceneManager {
   }
 
   handleDragMove(dragInfo) {
-    if (this.currentScene && this.currentScene.handleDrag) {
-      return this.currentScene.handleDrag(dragInfo);
+    if (this.currentScene) {
+      if (this.currentScene.handleDrag) return this.currentScene.handleDrag(dragInfo);
+      if (this.currentScene.handleDragMove) return this.currentScene.handleDragMove(dragInfo);
     }
     return false;
   }
@@ -99,5 +107,12 @@ export class SceneManager {
       return this.currentScene.handleFlick(flickInfo);
     }
     return false;
+  }
+
+  findEntityAt(x, y, scale = 1.0) {
+    if (this.currentScene && this.currentScene.findEntityAt) {
+      return this.currentScene.findEntityAt(x, y, scale);
+    }
+    return null;
   }
 }

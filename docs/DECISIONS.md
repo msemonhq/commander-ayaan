@@ -16,3 +16,7 @@ This log records decisions made during development. Format: one line per decisio
 - 2026-10-04: Created shared motion system (`tween.js`, `tokens.css`, `transition.js`) with non-blocking screen transitions that fast-forward within <= 100ms upon touch.
 - 2026-10-04: Replaced text door labels in Hub with live animated procedural canvas previews (spinning planet toy and hopping runway).
 - 2026-10-04: Replaced Meet the Planets with Planet Playground (`playground.js`), turning all 8 planets and the Sun into signature physical toys with true astronomical demos.
+- 2026-10-04: Parade `handleDragEnd` checks both pointer release position and visual coordinate distances within 1.5x slot radius to support weighted drag lag without miss-snaps.
+- 2026-10-04: Press-and-hold gestures for Sun and Mars support sustained hold lifecycle with explicit `handleHoldEnd` release to maintain continuous tactile feedback.
+- 2026-10-04: Parade Miss 3 auto-solve checks round/chapter completion to ensure progression when the final remaining slot is filled by Orbi co-play.
+- 2026-10-04: Parade Rung 3 "Who lives here?" pre-fills neighbor slots and presents 3 distinct choices in the tray to exercise spatial reasoning.

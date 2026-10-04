@@ -95,10 +95,12 @@ async function init() {
   gestures.setHandlers({
     onTap: (point) => sceneManager.handleTap(point.x, point.y),
     onHold: (point) => sceneManager.handleHold(point),
+    onHoldEnd: (point) => sceneManager.handleHoldEnd(point),
     onDragStart: (dragInfo) => sceneManager.handleDragStart(dragInfo),
     onDragMove: (dragInfo) => sceneManager.handleDragMove(dragInfo),
     onDragEnd: (dragInfo) => sceneManager.handleDragEnd(dragInfo),
-    onFlick: (flickInfo) => sceneManager.handleFlick(flickInfo)
+    onFlick: (flickInfo) => sceneManager.handleFlick(flickInfo),
+    findEntityAt: (x, y, scale) => sceneManager.findEntityAt(x, y, scale)
   });
 
   // Background pause & resume handling

@@ -177,6 +177,27 @@ export class HubScene {
     return false;
   }
 
+  findEntityAt(x, y, scale = 1.4) {
+    for (const st of this.stations) {
+      if (Math.hypot(x - st.x, y - st.y) <= st.radius * scale) {
+        return st;
+      }
+    }
+    const cx = this.width / 2;
+    const cy = this.height / 2;
+    const baseRadius = Math.min(this.width, this.height) * 0.44;
+    for (let i = 0; i < this.planetsData.length; i++) {
+      const p = this.planetsData[i];
+      const orbitR = baseRadius * (0.32 + (i / 7) * 0.65);
+      const pos = calculateOrbitPosition(i + 1, this.elapsed, (i * Math.PI) / 4, cx, cy, orbitR);
+      const planetRadius = Math.max(16, 26 * (p.radius_ratio || 1.0));
+      if (Math.hypot(x - pos.x, y - pos.y) <= planetRadius * scale) {
+        return p;
+      }
+    }
+    return null;
+  }
+
   update(dt) {
     this.elapsed += dt;
     this.previewPhase += dt;

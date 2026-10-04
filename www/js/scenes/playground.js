@@ -278,19 +278,28 @@ export class PlaygroundScene {
       audio.playTone(392.0, 0.4, 'triangle');
       haptics.tick();
       // Pour stream of tiny Earths into Sun
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 12; i++) {
         this.sunPouredEarths.push({
-          x: (Math.random() - 0.5) * 80,
-          y: -140 - Math.random() * 40,
-          targetY: (Math.random() - 0.5) * 60,
+          x: (Math.random() - 0.5) * 90,
+          y: -160 - Math.random() * 80,
+          targetY: (Math.random() - 0.5) * 70,
           alpha: 1.0,
-          speed: 120 + Math.random() * 80
+          speed: 130 + Math.random() * 90
         });
       }
     } else if (p.id === 'mars') {
       this.isMarsHeld = true;
       audio.playTone(329.63, 0.3, 'sine');
       haptics.tick();
+    }
+  }
+
+  handleHoldEnd(point) {
+    if (this.isSunHeld) {
+      this.isSunHeld = false;
+    }
+    if (this.isMarsHeld) {
+      this.isMarsHeld = false;
     }
   }
 
@@ -304,12 +313,12 @@ export class PlaygroundScene {
       this.venusSpinAngle += this.venusSpinVelocity;
       this.showVenusArrows = true;
     } else if (p.id === 'earth') {
-      // Turn Earth
+      // Turn Earth & Moon
       this.earthSpinAngle += dragInfo.vx * 0.003;
-      this.earthMoonAngle += dragInfo.vx * 0.002;
+      this.earthMoonAngle += (dragInfo.vx + (dragInfo.vy || 0)) * 0.003;
     } else if (p.id === 'jupiter') {
-      // Swirl bands
-      this.jupiterSwirlAngle += dragInfo.vx * 0.004;
+      // Swirl bands and spin spot
+      this.jupiterSwirlAngle += dragInfo.vx * 0.005;
     } else if (p.id === 'saturn') {
       // Tilt ring
       this.saturnRingTilt = Math.max(-0.7, Math.min(0.1, -0.35 + dragInfo.vy * 0.003));
@@ -329,7 +338,7 @@ export class PlaygroundScene {
     if (p.id === 'mercury') {
       // Mercury fast lap animation
       this.mercuryFastLap = 1.0;
-      this.mercuryDotRingPhase = 4;
+      this.mercuryDotRingPhase = 0;
       audio.playTone(523.25, 0.3, 'triangle');
       haptics.tick();
     }
@@ -349,6 +358,36 @@ export class PlaygroundScene {
     }
   }
 
+  findEntityAt(x, y, scale = 1.0) {
+    const cx = this.width / 2;
+    const cy = this.height / 2;
+
+    if (!this.focusedPlanet) {
+      const baseR = Math.min(this.width, this.height) * 0.44;
+      // Sun
+      if (Math.hypot(x - cx, y - cy) <= (Math.min(this.width, this.height) * 0.12) * scale) {
+        return this.planetsData.find(p => p.id === 'sun') || null;
+      }
+      // Planets
+      const planetsOnly = this.planetsData.filter(p => p.id !== 'sun');
+      for (let i = 0; i < planetsOnly.length; i++) {
+        const p = planetsOnly[i];
+        const orbitR = baseR * (0.32 + (i / 7) * 0.65);
+        const pos = calculateOrbitPosition(i + 1, this.elapsed, (i * Math.PI) / 4, cx, cy, orbitR);
+        const pr = Math.max(16, 26 * (p.radius_ratio || 1.0));
+        if (Math.hypot(x - pos.x, y - pos.y) <= pr * scale) {
+          return p;
+        }
+      }
+    } else {
+      const toyR = Math.min(this.width, this.height) * 0.22;
+      if (Math.hypot(x - cx, y - cy) <= toyR * scale) {
+        return this.focusedPlanet;
+      }
+    }
+    return null;
+  }
+
   update(dt) {
     this.elapsed += dt;
     sunRenderer.update(dt);
@@ -357,38 +396,54 @@ export class PlaygroundScene {
     particles.update(dt);
     ghostHand.update(dt);
 
-    // Sun hold light decay
+    // Sun hold light swell and pouring Earths stream
     if (this.isSunHeld) {
-      this.sunLightMultiplier = Math.min(2.2, this.sunLightMultiplier + dt * 1.5);
-      // Update tiny earths pouring in
-      for (const e of this.sunPouredEarths) {
-        e.y += dt * e.speed;
-        if (e.y >= e.targetY) {
-          e.y = e.targetY;
-          e.alpha = Math.max(0, e.alpha - dt * 0.8);
-        }
+      this.sunLightMultiplier = Math.min(2.5, this.sunLightMultiplier + dt * 1.5);
+      this.sunEarthSpawnTimer = (this.sunEarthSpawnTimer || 0) + dt;
+      if (this.sunEarthSpawnTimer >= 0.08) {
+        this.sunEarthSpawnTimer = 0;
+        this.sunPouredEarths.push({
+          x: (Math.random() - 0.5) * 90,
+          y: -150 - Math.random() * 40,
+          targetY: (Math.random() - 0.5) * 70,
+          alpha: 1.0,
+          speed: 140 + Math.random() * 100
+        });
       }
     } else {
-      this.sunLightMultiplier = Math.max(1.0, this.sunLightMultiplier - dt * 1.8);
+      this.sunLightMultiplier = Math.max(1.0, this.sunLightMultiplier - dt * 1.5);
     }
-    this.isSunHeld = false; // Reset per frame unless held
 
-    // Mercury fast lap
+    // Always update falling Earths
+    for (let i = this.sunPouredEarths.length - 1; i >= 0; i--) {
+      const e = this.sunPouredEarths[i];
+      e.y += dt * e.speed;
+      if (e.y >= e.targetY) {
+        e.y = e.targetY;
+        e.alpha = Math.max(0, e.alpha - dt * 1.4);
+        if (e.alpha <= 0) {
+          this.sunPouredEarths.splice(i, 1);
+        }
+      }
+    }
+
+    // Mercury fast lap & 4-dot ring progression
     if (this.mercuryFastLap > 0) {
-      this.mercuryFastLap -= dt * 0.7;
+      this.mercuryFastLap = Math.max(0, this.mercuryFastLap - dt * 0.7);
+      const lapProgress = 1 - this.mercuryFastLap;
+      this.mercuryDotRingPhase = Math.min(4, Math.floor(lapProgress * 4.9));
     }
 
     // Venus spin inertia
     this.venusSpinAngle += this.venusSpinVelocity * dt;
     this.venusSpinVelocity *= 0.94;
 
-    // Mars storm decay
+    // Mars storm decay on release
     if (this.isMarsHeld) {
-      this.marsStormIntensity = Math.min(1.0, this.marsStormIntensity + dt * 1.5);
+      this.marsStormIntensity = Math.min(1.0, this.marsStormIntensity + dt * 1.8);
     } else {
       this.marsStormIntensity = Math.max(0.0, this.marsStormIntensity - dt * 1.0);
     }
-    this.isMarsHeld = false;
 
     // Jupiter 11 Earths drop
     for (const e of this.jupiter11Earths) {
@@ -487,16 +542,31 @@ export class PlaygroundScene {
     const toyR = Math.min(this.width, this.height) * 0.22;
 
     if (p.id === 'sun') {
+      // Background planets illuminated at distance (farther stay dimmer)
+      const planetsOnly = this.planetsData.filter(pl => pl.id !== 'sun');
+      const baseR = Math.min(this.width, this.height) * 0.44;
+      for (let i = 0; i < planetsOnly.length; i++) {
+        const pl = planetsOnly[i];
+        const orbitR = baseR * (0.45 + (i / 7) * 0.52);
+        const pos = calculateOrbitPosition(i + 1, this.elapsed * 0.2, (i * Math.PI) / 4, cx, cy, orbitR);
+        const pr = Math.max(8, 14 * (pl.radius_ratio || 1.0));
+        ctx.save();
+        ctx.globalAlpha = Math.min(1.0, 0.45 + (this.sunLightMultiplier - 1.0) * 0.4 - (i / 8) * 0.3);
+        planetRenderer.renderPlanet(ctx, pl.id, pos.x, pos.y, pr, {});
+        lighting.applyLighting(ctx, pl.id, pos.x, pos.y, pr, cx, cy);
+        ctx.restore();
+      }
+
       // Sun Toy: Light intensity swells, tiny Earths stream in
-      const swellR = toyR * (0.8 + 0.3 * this.sunLightMultiplier);
+      const swellR = toyR * (0.85 + 0.35 * this.sunLightMultiplier);
       sunRenderer.render(ctx, cx, cy, swellR);
 
-      // Poured Earths
+      // Poured Earths filling the Sun's silhouette
       for (const e of this.sunPouredEarths) {
         if (e.alpha > 0) {
           ctx.save();
           ctx.globalAlpha = e.alpha;
-          planetRenderer.renderPlanet(ctx, 'earth', cx + e.x, cy + e.y, 4, {});
+          planetRenderer.renderPlanet(ctx, 'earth', cx + e.x, cy + e.y, 5, {});
           ctx.restore();
         }
       }
@@ -510,38 +580,95 @@ export class PlaygroundScene {
       // Render Toy Planet
       ctx.save();
       if (p.id === 'mercury') {
-        const lapOffset = this.mercuryFastLap > 0 ? Math.sin((1 - this.mercuryFastLap) * Math.PI * 2) * 80 : 0;
-        planetRenderer.renderPlanet(ctx, 'mercury', cx + lapOffset, cy, toyR, {});
-        lighting.applyLighting(ctx, 'mercury', cx + lapOffset, cy, toyR, sunCornerX, sunCornerY);
+        let mercuryX = cx;
+        let mercuryY = cy;
 
-        // 4 dots ring
-        if (this.mercuryDotRingPhase > 0) {
+        if (this.mercuryFastLap > 0) {
+          const lapProgress = 1 - this.mercuryFastLap;
+          const lapAngle = lapProgress * Math.PI * 4; // 2 laps
+          const lapRx = toyR * 1.35;
+          const lapRy = toyR * 0.85;
+          mercuryX = cx + Math.cos(lapAngle) * lapRx;
+          mercuryY = cy + Math.sin(lapAngle) * lapRy;
+
+          // Motion smear trail
           ctx.save();
-          for (let d = 0; d < 4; d++) {
-            const da = (d * Math.PI) / 2;
-            const dx = cx + Math.cos(da) * (toyR * 1.45);
-            const dy = cy + Math.sin(da) * (toyR * 1.45);
+          for (let s = 1; s <= 4; s++) {
+            const sAngle = lapAngle - s * 0.22;
+            const sx = cx + Math.cos(sAngle) * lapRx;
+            const sy = cy + Math.sin(sAngle) * lapRy;
             ctx.beginPath();
-            ctx.arc(dx, dy, 7, 0, Math.PI * 2);
-            ctx.fillStyle = '#FFE082';
-            ctx.shadowColor = '#FFA000';
-            ctx.shadowBlur = 8;
+            ctx.arc(sx, sy, toyR * (0.85 - s * 0.15), 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(158, 154, 148, ${0.35 - s * 0.08})`;
             ctx.fill();
           }
           ctx.restore();
         }
+
+        planetRenderer.renderPlanet(ctx, 'mercury', mercuryX, mercuryY, toyR, {});
+        lighting.applyLighting(ctx, 'mercury', mercuryX, mercuryY, toyR, sunCornerX, sunCornerY);
+
+        // 4 dots ring beside Earth's orbit - lights up one by one!
+        ctx.save();
+        for (let d = 0; d < 4; d++) {
+          const da = (d * Math.PI) / 2 - Math.PI / 2;
+          const dx = cx + Math.cos(da) * (toyR * 1.55);
+          const dy = cy + Math.sin(da) * (toyR * 1.55);
+          const isLit = d < this.mercuryDotRingPhase;
+
+          ctx.beginPath();
+          ctx.arc(dx, dy, isLit ? 8 : 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = isLit ? '#FFE082' : 'rgba(255, 255, 255, 0.25)';
+          if (isLit) {
+            ctx.shadowColor = '#FFA000';
+            ctx.shadowBlur = 10;
+          }
+          ctx.fill();
+        }
+        ctx.restore();
       } else if (p.id === 'venus') {
         planetRenderer.renderPlanet(ctx, 'venus', cx, cy, toyR, { spinAngle: this.venusSpinAngle });
         lighting.applyLighting(ctx, 'venus', cx, cy, toyR, sunCornerX, sunCornerY);
 
         if (this.showVenusArrows) {
-          // Draw opposite spin indicator arrow pair
+          // Draw opposite spin comparison indicator: Earth (CCW prograde) vs Venus (CW retrograde)
           ctx.save();
-          ctx.strokeStyle = '#FFE082';
-          ctx.lineWidth = 3;
+          const compY = cy + toyR * 1.35;
+
+          // Earth spin comparison
+          ctx.save();
+          ctx.translate(cx - 55, compY);
+          planetRenderer.renderPlanet(ctx, 'earth', 0, 0, 14, {});
+          ctx.strokeStyle = '#70D6FF';
+          ctx.lineWidth = 2.5;
           ctx.beginPath();
-          ctx.arc(cx, cy + toyR * 1.3, 24, Math.PI, 0); // Reverse direction
+          ctx.arc(0, 0, 24, Math.PI * 0.2, Math.PI * 1.3);
           ctx.stroke();
+          ctx.fillStyle = '#70D6FF';
+          ctx.beginPath();
+          ctx.moveTo(-16, -18);
+          ctx.lineTo(-24, -13);
+          ctx.lineTo(-17, -8);
+          ctx.fill();
+          ctx.restore();
+
+          // Venus spin comparison
+          ctx.save();
+          ctx.translate(cx + 55, compY);
+          planetRenderer.renderPlanet(ctx, 'venus', 0, 0, 14, {});
+          ctx.strokeStyle = '#FFE082';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, 24, -Math.PI * 0.3, Math.PI * 0.8);
+          ctx.stroke();
+          ctx.fillStyle = '#FFE082';
+          ctx.beginPath();
+          ctx.moveTo(16, 18);
+          ctx.lineTo(24, 13);
+          ctx.lineTo(17, 8);
+          ctx.fill();
+          ctx.restore();
+
           ctx.restore();
         }
       } else if (p.id === 'earth') {
@@ -562,7 +689,7 @@ export class PlaygroundScene {
           ctx.save();
           ctx.beginPath();
           ctx.arc(cx, cy, toyR * 1.1, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(211, 84, 0, ${this.marsStormIntensity * 0.45})`;
+          ctx.fillStyle = `rgba(211, 84, 0, ${this.marsStormIntensity * 0.55})`;
           ctx.fill();
           ctx.restore();
         }

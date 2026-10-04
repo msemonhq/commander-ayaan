@@ -40,6 +40,17 @@
   - Wordless check verified: hiding all text leaves interface 100% intuitive with zero sentences during play.
   - Coach test verified: cold start following ONLY the ghost hand completes Round 1 without any adult help.
 
+### Pass 4: Adversarial Review, Gesture Lifecycle & Multi-Rung Hardening
+- **Observations & Deep Fixes**:
+  - Uncovered method name mismatch (`handleDrag` vs `handleDragMove`), resolving frozen tray planet drag.
+  - Resolved `NaN` canvas radius crash on Parade Sun marker (`Math.min(54, slotRadius => ...)` arrow function).
+  - Resolved infinite hang on Miss 3 auto-solve when filling the final slot.
+  - Fixed Rung 3 "Who lives here?" so that neighbors are pre-placed on runway while 3 distinct choices are provided in the tray.
+  - Fixed Rung 5 dual-chapter runway and tray positioning during viewport resize/rotation.
+  - Enhanced gesture recognizer with sustained hold lifecycle (`handleHoldEnd`), so Sun light swell and Mars dust storms persist while held and settle upon release.
+  - Added dual pointer-release and visual-lag coordinate checks in `handleDragEnd`, eliminating miss-snaps from weighted drag lag.
+  - Re-verified all 41 unit tests and 9 full Playwright E2E tests across all 5 device viewports.
+
 ---
 
 ## 2. 10-Point Rubric Evaluation (Scale 1 to 5)

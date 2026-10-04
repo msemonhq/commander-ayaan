@@ -34,7 +34,7 @@ export class GestureRecognizer {
 
     // Hold timer
     this.holdTimer = null;
-    this.holdDuration = 1200; // ms (<= 1.5s)
+    this.holdDuration = 800; // ms (0.8s <= 1.5s)
     this.holdFired = false;
 
     // Throttling
@@ -51,6 +51,7 @@ export class GestureRecognizer {
       onDragMove: null,
       onDragEnd: null,
       onHold: null,
+      onHoldEnd: null,
       onFlick: null,
       findEntityAt: null // Provided by scene: (x, y) => entity
     };
@@ -72,6 +73,7 @@ export class GestureRecognizer {
       onDragMove: null,
       onDragEnd: null,
       onHold: null,
+      onHoldEnd: null,
       onFlick: null,
       findEntityAt: null
     };
@@ -236,7 +238,16 @@ export class GestureRecognizer {
           entity: this.draggedEntity
         });
       }
-    } else if (!this.holdFired) {
+    } else if (this.holdFired) {
+      // Hold released!
+      if (this.handlers.onHoldEnd) {
+        this.handlers.onHoldEnd({
+          x: coords.cssX,
+          y: coords.cssY,
+          entity: this.draggedEntity
+        });
+      }
+    } else {
       // Tap detected!
       const entity = this.handlers.findEntityAt ? this.handlers.findEntityAt(coords.cssX, coords.cssY, 1.4) : null;
       const targetId = entity ? (entity.id || entity.name || 'entity') : 'empty';
@@ -263,6 +274,7 @@ export class GestureRecognizer {
       }
     }
 
+    this.holdFired = false;
     this.draggedEntity = null;
   }
 
@@ -270,6 +282,14 @@ export class GestureRecognizer {
     if (e.pointerId === this.activePointerId) {
       this.activePointerId = null;
       if (this.holdTimer) clearTimeout(this.holdTimer);
+      if (this.holdFired && this.handlers.onHoldEnd) {
+        this.handlers.onHoldEnd({
+          x: this.currentX,
+          y: this.currentY,
+          entity: this.draggedEntity
+        });
+      }
+      this.holdFired = false;
       this.isDragging = false;
       this.draggedEntity = null;
     }

@@ -61,6 +61,8 @@ export class ParadeScene {
   }
 
   enter() {
+    this.width = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 800;
+    this.height = (typeof window !== 'undefined' && window.innerHeight) ? window.innerHeight : 600;
     this.elapsed = 0;
     this.round = 1;
     this.currentRung = adaptive.getRung('parade');
@@ -70,6 +72,87 @@ export class ParadeScene {
 
     this.buildUI();
     this.startRound();
+  }
+
+  handleResize(width, height) {
+    this.width = width;
+    this.height = height;
+    this.realignRunwayAndTray();
+  }
+
+  realignRunwayAndTray() {
+    if (!this.slots || this.slots.length === 0) return;
+    const isLandscape = this.width > this.height;
+    const numSlots = this.slots.length;
+    const slotRadius = Math.max(32, Math.min(46, (isLandscape ? this.width : this.height) / (numSlots + 3) / 2));
+
+    if (isLandscape) {
+      const startX = this.width * 0.22;
+      const endX = this.width * 0.88;
+      const stepX = (endX - startX) / Math.max(1, numSlots - 1);
+      const runwayY = this.height * 0.44;
+
+      for (let i = 0; i < numSlots; i++) {
+        const slot = this.slots[i];
+        slot.x = startX + i * stepX;
+        slot.y = runwayY;
+        slot.radius = slotRadius;
+      }
+
+      const trayStartX = this.width * 0.25;
+      const trayStepX = (this.width * 0.5) / Math.max(1, this.tray.length - 1);
+      const trayY = this.height * 0.78;
+
+      for (let i = 0; i < this.tray.length; i++) {
+        const item = this.tray[i];
+        item.homeX = trayStartX + i * trayStepX;
+        item.homeY = trayY;
+        if (!item.isPlaced && (!this.draggedItem || this.draggedItem !== item)) {
+          item.x = item.homeX;
+          item.y = item.homeY;
+        } else if (item.isPlaced) {
+          const matchingSlot = this.slots.find(s => s.planetId === item.id);
+          if (matchingSlot) {
+            item.x = matchingSlot.x;
+            item.y = matchingSlot.y;
+          }
+        }
+        item.radius = slotRadius * 0.85;
+      }
+    } else {
+      const startY = this.height * 0.22;
+      const endY = this.height * 0.62;
+      const stepY = (endY - startY) / Math.max(1, numSlots - 1);
+      const runwayX = this.width * 0.42;
+
+      for (let i = 0; i < numSlots; i++) {
+        const slot = this.slots[i];
+        slot.x = runwayX;
+        slot.y = startY + i * stepY;
+        slot.radius = slotRadius;
+      }
+
+      const trayStartX = this.width * 0.2;
+      const trayStepX = (this.width * 0.6) / Math.max(1, this.tray.length - 1);
+      const trayY = this.height * 0.82;
+
+      for (let i = 0; i < this.tray.length; i++) {
+        const item = this.tray[i];
+        item.homeX = trayStartX + i * trayStepX;
+        item.homeY = trayY;
+        if (!item.isPlaced && (!this.draggedItem || this.draggedItem !== item)) {
+          item.x = item.homeX;
+          item.y = item.homeY;
+        } else if (item.isPlaced) {
+          const matchingSlot = this.slots.find(s => s.planetId === item.id);
+          if (matchingSlot) {
+            item.x = matchingSlot.x;
+            item.y = matchingSlot.y;
+          }
+        }
+        item.radius = slotRadius * 0.85;
+      }
+    }
   }
 
   exit() {
@@ -133,32 +216,38 @@ export class ParadeScene {
     this.selectedTrayItem = null;
 
     const allPlanets = this.sceneManager.game.planetsData.filter(p => p.id !== 'sun');
-    let targetPlanets = [];
-    let showSilhouettes = true;
 
     if (this.currentRung === 1) {
       // R1: Mercury, Venus, Earth (with silhouettes)
-      targetPlanets = allPlanets.slice(0, 3);
-      showSilhouettes = true;
+      this.setupRunwayAndTray(allPlanets.slice(0, 3), true);
     } else if (this.currentRung === 2) {
       // R2: Mercury to Mars (4 planets, with silhouettes)
-      targetPlanets = allPlanets.slice(0, 4);
-      showSilhouettes = true;
+      this.setupRunwayAndTray(allPlanets.slice(0, 4), true);
     } else if (this.currentRung === 3) {
-      // R3: "Who lives here?" slot between two placed neighbours (e.g. Earth between Venus & Mars)
-      targetPlanets = allPlanets.slice(1, 4); // Venus, Earth, Mars
-      showSilhouettes = false;
+      // R3: "Who lives here?" One empty slot sits between two placed neighbours.
+      // Choose from a tray of 3 planets. No silhouettes.
+      // E.g. Venus (order 2), Earth (order 3, EMPTY), Mars (order 4)
+      const runwayPlanets = allPlanets.slice(1, 4); // Venus, Earth, Mars
+      const candidatePlanets = [
+        allPlanets.find(p => p.id === 'earth'),
+        allPlanets.find(p => p.id === 'mercury'),
+        allPlanets.find(p => p.id === 'jupiter')
+      ];
+      this.setupRung3(runwayPlanets, candidatePlanets);
     } else if (this.currentRung === 4) {
       // R4: Mercury to Saturn (6 planets, no silhouettes)
-      targetPlanets = allPlanets.slice(0, 6);
-      showSilhouettes = false;
+      this.setupRunwayAndTray(allPlanets.slice(0, 6), false);
     } else {
       // R5: all 8 planets in two chapters
-      targetPlanets = this.r5Chapter === 1 ? allPlanets.slice(0, 4) : allPlanets.slice(4, 8);
-      showSilhouettes = false;
+      if (this.r5Chapter === 1) {
+        // Chapter 1: 4 inner planets
+        this.setupRunwayAndTray(allPlanets.slice(0, 4), false);
+      } else {
+        // Chapter 2: 4 outer planets to place, with inner 4 pre-placed
+        this.setupRung5Chapter2(allPlanets);
+      }
     }
 
-    this.setupRunwayAndTray(targetPlanets, showSilhouettes);
     this.updateCoachTarget();
   }
 
@@ -265,15 +354,206 @@ export class ParadeScene {
         });
       }
     }
+  }
 
-    // Special case for Rung 3: "Who lives here?" Pre-fill 1st and 3rd slots
-    if (this.currentRung === 3 && this.slots.length === 3) {
-      this.slots[0].isFilled = true;
-      this.slots[2].isFilled = true;
-      const placed1 = this.tray.find(t => t.id === this.slots[0].planetId);
-      const placed2 = this.tray.find(t => t.id === this.slots[2].planetId);
-      if (placed1) placed1.isPlaced = true;
-      if (placed2) placed2.isPlaced = true;
+  setupRung3(runwayPlanets, candidatePlanets) {
+    const isLandscape = this.width > this.height;
+    const numSlots = 3;
+    const slotRadius = Math.max(38, Math.min(48, (isLandscape ? this.width : this.height) / (numSlots + 3) / 2));
+
+    this.slots = [];
+    this.tray = [];
+
+    // Create 3 slots: Venus (placed), Earth (empty), Mars (placed)
+    if (isLandscape) {
+      const startX = this.width * 0.28;
+      const endX = this.width * 0.82;
+      const stepX = (endX - startX) / 2;
+      const runwayY = this.height * 0.44;
+
+      for (let i = 0; i < 3; i++) {
+        const p = runwayPlanets[i];
+        this.slots.push({
+          id: 'slot-' + p.id,
+          order: p.order,
+          planetId: p.id,
+          x: startX + i * stepX,
+          y: runwayY,
+          radius: slotRadius,
+          isFilled: (i === 0 || i === 2), // Neighbours pre-placed!
+          silhouette: false,
+          distanceBrightness: 1.0 - (i / 3) * 0.35
+        });
+      }
+
+      const shuffled = [...candidatePlanets].sort(() => Math.random() - 0.5);
+      const trayStartX = this.width * 0.25;
+      const trayStepX = (this.width * 0.5) / 2;
+      const trayY = this.height * 0.78;
+
+      for (let i = 0; i < 3; i++) {
+        const p = shuffled[i];
+        this.tray.push({
+          id: p.id,
+          order: p.order,
+          name_key: p.name_key,
+          note: p.note,
+          color: p.color,
+          radius: slotRadius * 0.85,
+          homeX: trayStartX + i * trayStepX,
+          homeY: trayY,
+          x: trayStartX + i * trayStepX,
+          y: trayY,
+          isPlaced: false,
+          isSelected: false,
+          wobble: 0
+        });
+      }
+    } else {
+      const startY = this.height * 0.25;
+      const endY = this.height * 0.60;
+      const stepY = (endY - startY) / 2;
+      const runwayX = this.width * 0.42;
+
+      for (let i = 0; i < 3; i++) {
+        const p = runwayPlanets[i];
+        this.slots.push({
+          id: 'slot-' + p.id,
+          order: p.order,
+          planetId: p.id,
+          x: runwayX,
+          y: startY + i * stepY,
+          radius: slotRadius,
+          isFilled: (i === 0 || i === 2),
+          silhouette: false,
+          distanceBrightness: 1.0 - (i / 3) * 0.35
+        });
+      }
+
+      const shuffled = [...candidatePlanets].sort(() => Math.random() - 0.5);
+      const trayStartX = this.width * 0.2;
+      const trayStepX = (this.width * 0.6) / 2;
+      const trayY = this.height * 0.82;
+
+      for (let i = 0; i < 3; i++) {
+        const p = shuffled[i];
+        this.tray.push({
+          id: p.id,
+          order: p.order,
+          name_key: p.name_key,
+          note: p.note,
+          color: p.color,
+          radius: slotRadius * 0.85,
+          homeX: trayStartX + i * trayStepX,
+          homeY: trayY,
+          x: trayStartX + i * trayStepX,
+          y: trayY,
+          isPlaced: false,
+          isSelected: false,
+          wobble: 0
+        });
+      }
+    }
+  }
+
+  setupRung5Chapter2(allPlanets) {
+    const isLandscape = this.width > this.height;
+    const numSlots = 8;
+    const slotRadius = Math.max(32, Math.min(42, (isLandscape ? this.width : this.height) / (numSlots + 3) / 2));
+
+    this.slots = [];
+    this.tray = [];
+
+    if (isLandscape) {
+      const startX = this.width * 0.18;
+      const endX = this.width * 0.92;
+      const stepX = (endX - startX) / 7;
+      const runwayY = this.height * 0.44;
+
+      for (let i = 0; i < 8; i++) {
+        const p = allPlanets[i];
+        this.slots.push({
+          id: 'slot-' + p.id,
+          order: p.order,
+          planetId: p.id,
+          x: startX + i * stepX,
+          y: runwayY,
+          radius: slotRadius,
+          isFilled: i < 4, // Inner 4 planets pre-placed!
+          silhouette: false,
+          distanceBrightness: 1.0 - (i / 8) * 0.35
+        });
+      }
+
+      const outerPlanets = allPlanets.slice(4, 8);
+      const shuffled = [...outerPlanets].sort(() => Math.random() - 0.5);
+      const trayStartX = this.width * 0.25;
+      const trayStepX = (this.width * 0.5) / 3;
+      const trayY = this.height * 0.78;
+
+      for (let i = 0; i < 4; i++) {
+        const p = shuffled[i];
+        this.tray.push({
+          id: p.id,
+          order: p.order,
+          name_key: p.name_key,
+          note: p.note,
+          color: p.color,
+          radius: slotRadius * 0.9,
+          homeX: trayStartX + i * trayStepX,
+          homeY: trayY,
+          x: trayStartX + i * trayStepX,
+          y: trayY,
+          isPlaced: false,
+          isSelected: false,
+          wobble: 0
+        });
+      }
+    } else {
+      const startY = this.height * 0.18;
+      const endY = this.height * 0.68;
+      const stepY = (endY - startY) / 7;
+      const runwayX = this.width * 0.42;
+
+      for (let i = 0; i < 8; i++) {
+        const p = allPlanets[i];
+        this.slots.push({
+          id: 'slot-' + p.id,
+          order: p.order,
+          planetId: p.id,
+          x: runwayX,
+          y: startY + i * stepY,
+          radius: slotRadius,
+          isFilled: i < 4,
+          silhouette: false,
+          distanceBrightness: 1.0 - (i / 8) * 0.35
+        });
+      }
+
+      const outerPlanets = allPlanets.slice(4, 8);
+      const shuffled = [...outerPlanets].sort(() => Math.random() - 0.5);
+      const trayStartX = this.width * 0.2;
+      const trayStepX = (this.width * 0.6) / 3;
+      const trayY = this.height * 0.82;
+
+      for (let i = 0; i < 4; i++) {
+        const p = shuffled[i];
+        this.tray.push({
+          id: p.id,
+          order: p.order,
+          name_key: p.name_key,
+          note: p.note,
+          color: p.color,
+          radius: slotRadius * 0.9,
+          homeX: trayStartX + i * trayStepX,
+          homeY: trayY,
+          x: trayStartX + i * trayStepX,
+          y: trayY,
+          isPlaced: false,
+          isSelected: false,
+          wobble: 0
+        });
+      }
     }
   }
 
@@ -346,10 +626,14 @@ export class ParadeScene {
     }
   }
 
-  handleDragMove(dragInfo) {
+  handleDrag(dragInfo) {
     if (!this.draggedItem) return;
     this.draggedItem.x = dragInfo.visualX;
     this.draggedItem.y = dragInfo.visualY;
+  }
+
+  handleDragMove(dragInfo) {
+    this.handleDrag(dragInfo);
   }
 
   handleDragEnd(dragInfo) {
@@ -358,13 +642,15 @@ export class ParadeScene {
     const item = this.draggedItem;
     this.draggedItem = null;
 
-    // Check if near any slot (within 1.5 radius)
+    // Check if near any slot (within 1.5 radius of pointer release position OR item visual position)
     let bestSlot = null;
     let minDist = Infinity;
 
     for (const slot of this.slots) {
       if (slot.isFilled) continue;
-      const d = Math.hypot(item.x - slot.x, item.y - slot.y);
+      const dPointer = (dragInfo && typeof dragInfo.x === 'number') ? Math.hypot(dragInfo.x - slot.x, dragInfo.y - slot.y) : Infinity;
+      const dItem = Math.hypot(item.x - slot.x, item.y - slot.y);
+      const d = Math.min(dPointer, dItem);
       if (d < slot.radius * 1.5 && d < minDist) {
         minDist = d;
         bestSlot = slot;
@@ -378,6 +664,21 @@ export class ParadeScene {
       item.x = item.homeX;
       item.y = item.homeY;
     }
+  }
+
+  findEntityAt(x, y, scale = 1.4) {
+    for (const item of this.tray) {
+      if (item.isPlaced) continue;
+      if (Math.hypot(x - item.x, y - item.y) <= item.radius * scale) {
+        return item;
+      }
+    }
+    for (const slot of this.slots) {
+      if (Math.hypot(x - slot.x, y - slot.y) <= slot.radius * scale) {
+        return slot;
+      }
+    }
+    return null;
   }
 
   attemptPlacement(item, slot) {
@@ -396,7 +697,7 @@ export class ParadeScene {
       haptics.tick();
       particles.emit(slot.x, slot.y, { color: item.color, count: 6 });
 
-      // Check if all slots in current chapter are filled
+      // Check if all slots in current chapter/round are filled
       const allFilled = this.slots.every(s => s.isFilled);
       if (allFilled) {
         if (this.currentRung === 5 && this.r5Chapter === 1) {
@@ -422,16 +723,35 @@ export class ParadeScene {
       item.y = item.homeY;
 
       if (hintResult.autoSolve) {
-        // Miss 3: Orbi co-play!
-        const correctSlot = this.slots.find(s => s.planetId === item.id);
-        if (correctSlot) {
-          correctSlot.isFilled = true;
-          item.isPlaced = true;
-          item.x = correctSlot.x;
-          item.y = correctSlot.y;
-          audio.playPlanetNote(item.note);
-          particles.emit(correctSlot.x, correctSlot.y, { color: item.color, count: 6 });
-          this.updateCoachTarget();
+        // Miss 3: Orbi co-play auto-placement!
+        let fillSlot = slot;
+        let fillItem = this.tray.find(t => t.id === fillSlot.planetId && !t.isPlaced);
+        if (!fillItem) {
+          fillSlot = this.slots.find(s => s.planetId === item.id && !s.isFilled);
+          fillItem = fillSlot ? item : null;
+        }
+
+        if (fillSlot && fillItem) {
+          fillSlot.isFilled = true;
+          fillItem.isPlaced = true;
+          fillItem.isSelected = false;
+          fillItem.x = fillSlot.x;
+          fillItem.y = fillSlot.y;
+          this.selectedTrayItem = null;
+          audio.playPlanetNote(fillItem.note);
+          particles.emit(fillSlot.x, fillSlot.y, { color: fillItem.color, count: 6 });
+
+          const allFilled = this.slots.every(s => s.isFilled);
+          if (allFilled) {
+            if (this.currentRung === 5 && this.r5Chapter === 1) {
+              this.r5Chapter = 2;
+              setTimeout(() => this.startRound(), 600);
+            } else {
+              this.handleRoundComplete();
+            }
+          } else {
+            this.updateCoachTarget();
+          }
         }
       }
     }
@@ -503,8 +823,11 @@ export class ParadeScene {
   }
 
   render(ctx, width, height) {
-    this.width = width;
-    this.height = height;
+    if (this.width !== width || this.height !== height) {
+      this.width = width;
+      this.height = height;
+      this.realignRunwayAndTray();
+    }
 
     // Deep space
     ctx.fillStyle = '#0A0D24';
@@ -519,7 +842,8 @@ export class ParadeScene {
     this.renderConstellation(ctx);
 
     // 2. Sun Runway Marker at one end
-    const sunMarkerR = Math.max(38, Math.min(54, slotRadius => slotRadius * 1.1));
+    const slotRadius = this.slots[0]?.radius || 40;
+    const sunMarkerR = Math.max(38, Math.min(54, slotRadius * 1.15));
     const sunX = isLandscape ? width * 0.11 : width * 0.42;
     const sunY = isLandscape ? height * 0.44 : height * 0.12;
     sunRenderer.render(ctx, sunX, sunY, sunMarkerR);
