@@ -20,3 +20,4 @@ This log records decisions made during development. Format: one line per decisio
 - 2026-10-04: Press-and-hold gestures for Sun and Mars support sustained hold lifecycle with explicit `handleHoldEnd` release to maintain continuous tactile feedback.
 - 2026-10-04: Parade Miss 3 auto-solve checks round/chapter completion to ensure progression when the final remaining slot is filled by Orbi co-play.
 - 2026-10-04: Parade Rung 3 "Who lives here?" pre-fills neighbor slots and presents 3 distinct choices in the tray to exercise spatial reasoning.
+- 2026-10-04: Created custom paper-cut planetarium Android launcher icons (adaptive foreground/background vector XML and full mipmap density PNGs from mdpi to xxxhdpi) featuring Sun, Orbi, and Earth against deep indigo space.
