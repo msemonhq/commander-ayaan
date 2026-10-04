@@ -1,10 +1,14 @@
 /**
- * Haptic feedback wrapper.
+ * Haptic feedback wrapper (js/core/haptics.js).
  * Integrates Capacitor Haptics with Web Vibration API fallback.
  */
 class HapticsSystem {
   constructor() {
     this.hasVibrate = typeof navigator !== 'undefined' && Boolean(navigator.vibrate);
+  }
+
+  tick() {
+    this.light();
   }
 
   light() {

@@ -1,17 +1,33 @@
 # Commander Ayaan 🚀
-*A Gentle, Tactile Solar System Workshop for Early Explorers*
+*A Gentle, Wordless Solar System Workshop for Early Explorers (V2)*
 
-Commander Ayaan is an HTML5 Canvas game wrapped with Capacitor 8 for Android, built specifically for six-year-old curiosity. In this workshop, the solar system is a tactile toy box: Ayaan explores real planets, discovers how orbits work, orders celestial bodies on a spatial runway, and solves playful challenges alongside Orbi, his friendly robotic companion.
+Commander Ayaan is an HTML5 Canvas game wrapped with Capacitor 8 for Android, built specifically for a six-year-old's hands and eyes. In this workshop, the solar system is a tactile toy box: Ayaan explores real planets, spins them with a finger, orders celestial bodies on a spatial runway, and solves playful challenges alongside Orbi, his friendly robot companion.
+
+There are no sentences on screen during play. A translucent ghost hand shows gestures, lighting from the Sun carries scientific meaning, and results are physical.
 
 ---
 
 ## 🌟 Phase 1 Features
-- **Paper-cut Planetarium Visual Style**: Procedural Canvas 2D art for the Sun, Moon, Orbi, and all 8 planets with distinctive textures, silhouettes, and cloud bands.
-- **Living Mission Control Hub**: Real-time orbiting planets on rails obeying monotone speed laws (closer laps faster), interactive taps emitting pentatonic notes and stardust.
-- **Meet the Planets**: Free exploration mode with smooth camera glide, signature animations (Venus reverse spin, Earth's orbiting Moon, Mars dust puffs, Saturn's ring wobble), and NASA-verified facts (each 12 words or fewer).
-- **Planet Parade**: Spatial-reasoning runway ordering game with 5 adaptive rungs, dot counting scaffolding, and a gentle 3-step hint ladder (soft boop wobble -> glowing slot -> Orbi co-play).
-- **Pentatonic WebAudio Synth**: Harmonic bells, celestas, and marimba tones; capped master limiter; instant 1-tap mute.
-- **Zero Ads, Zero Tracking, 100% Offline**: Private, safe, and respectful of early readers.
+- **Wordless Ghost Hand & Coach**: Translucent animated glove demonstrating gestures (tap, drag, hold, flick) on first encounter or after 6s idle.
+- **Lighting-Led Rendering**: Every body is dynamically illuminated by the Sun with soft day/night terminators, rim highlights, atmosphere glows, and tiny night-side Earth city lights.
+- **Shared Motion System**: Every state change, transition, and touch animates with anticipation, action, and settle. Non-blocking: touches during transitions fast-forward smoothly in <= 100ms.
+- **Living Hub**: Sun at center, all 8 planets orbiting on rails, and 2 live-preview circular stations (Playground and Parade) with zero text labels.
+- **Planet Playground**: Tactile toys demonstrating true science:
+  - **Sun**: Hold to brighten; stream of tiny Earths pours in (>1.3M fill).
+  - **Mercury**: Flick for fast lap; 4-dot ring lights up (4 laps vs Earth's 1).
+  - **Venus**: Drag across to spin backwards opposite to finger; reverse arrow pair.
+  - **Earth**: Turn with inertia; night city lights illuminate; drag orbiting Moon.
+  - **Mars**: Hold to stir up billowing rust dust storm.
+  - **Jupiter**: Swirl cloud bands and Red Spot; tap to line up 11 Earths across face.
+  - **Saturn**: Drag ring to tilt with decaying wobble and ice sparkles.
+  - **Uranus**: Tap to roll on side with vertical spinning ring.
+  - **Neptune**: Sweep across for supersonic wind streaks.
+- **Planet Parade**: Spatial reasoning runway game placing planets by distance from Sun:
+  - 5 adaptive rungs (R1: 3 planets, R2: 4 planets, R3: "who lives here?", R4: 6 planets, R5: 8 planets in two chapters).
+  - 3-step gentle hint ladder (wobble boop -> slower demo with breathing slot -> Orbi co-play).
+  - 5-star constellation drawing star by star across top.
+- **Touch & Accessibility Standards**: Touch targets strictly >= 72dp (min 64dp + 40% hit expansion), text contrast >= 7:1, 300ms double-tap protection, reduce-motion support.
+- **Zero Ads, Zero Tracking, 100% Offline**: Private, safe, and child-protective.
 
 ---
 
@@ -33,7 +49,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Running Tests
 ```bash
-# Run unit test suite (adaptive engine, hint ladder, orbits math, i18n facts)
+# Run unit test suite (adaptive engine, hint ladder, orbits math, storage, gestures, coach)
 npm test
 
 # Run Playwright end-to-end tests
@@ -58,28 +74,3 @@ A fresh debug APK is automatically built and tested on every push via GitHub Act
 8. Launch **Ayaan** and enjoy!
 
 *Note: This is a debug build intended for testing and playtesting.*
-
----
-
-## 🏛️ Project Architecture
-```
-Commander Ayaan/
-├── AGENTS.md                  # Master Brief and standing rules
-├── capacitor.config.json      # Capacitor 8 mobile configuration
-├── .github/workflows/         # CI/CD pipeline (build-apk.yml)
-├── android/                   # Generated native Android project
-├── docs/                      # Scientific foundations, decisions, playtest guides
-├── qa/                        # Screen review archives and playtest logs
-├── tests/
-│   ├── unit/                  # Adaptive, hints, orbits, and i18n unit tests
-│   └── e2e/                   # Playwright multi-viewport integration tests
-└── www/                       # Pure ES Module web application
-    ├── css/                   # tokens.css, base.css, ui.css
-    ├── js/
-    │   ├── core/              # loop.js, scenes.js, input.js, events.js, storage.js, audio.js
-    │   ├── sim/               # orbits.js, camera.js
-    │   ├── render/            # sun.js, planet.js, moon.js, orbi.js, stars.js, particles.js
-    │   ├── scenes/            # boot.js, hub.js, meet.js, parade.js
-    │   └── systems/           # adaptive.js, hints.js, rewards.js, session.js
-    └── index.html
-```

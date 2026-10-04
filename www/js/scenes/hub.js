@@ -1,40 +1,68 @@
 /**
- * Hub Scene: Mission Control (js/scenes/hub.js).
- * Living solar system background: Sun, 8 orbiting planets on rails, Orbi floating.
- * Exactly two doors (Meet the Planets, Planet Parade), plus mute button.
- * Every planet in background is tappable: plays note and emits sparkles.
+ * Living Mission Control Hub Scene (js/scenes/hub.js).
+ * Strictly wordless:
+ * - Center glowing Sun with 8 planets on slow orbits on rails
+ * - Dynamic Sun-directional lighting on all bodies
+ * - Orbi companion floating peacefully
+ * - 2 big round live-preview station doors orbiting the Sun:
+ *    1. Playground station: planet being spun by miniature ghost hand (NO label)
+ *    2. Parade station: tiny planets hopping into a row (NO label)
+ * - Corner mute toggle (>= 72dp)
+ * - Every planet is tappable: scale spring pop, note, sparkles, ripple
+ * - Shared-element transition to mode (550ms, non-blocking)
  */
 import { sunRenderer } from '../render/sun.js';
+import { planetRenderer } from '../render/planet.js';
 import { orbiRenderer } from '../render/orbi.js';
 import { starfield } from '../render/stars.js';
 import { particles } from '../render/particles.js';
-import { spriteCache } from '../render/sprites.js';
-import { calculateOrbitPosition } from '../sim/orbits.js';
+import { lighting } from '../render/lighting.js';
+import { ghostHand } from '../render/hand.js';
 import { audio } from '../core/audio.js';
-import { i18n } from '../core/i18n.js';
-import { storage } from '../core/storage.js';
-import { adaptive } from '../systems/adaptive.js';
-import { InputManager } from '../core/input.js';
+import { haptics } from '../core/haptics.js';
+import { calculateOrbitPosition } from '../sim/orbits.js';
+import { coach } from '../systems/coach.js';
+import { transition } from '../render/transition.js';
+import { Easings } from '../core/tween.js';
 
 export class HubScene {
-  constructor(planetsData = []) {
-    this.planets = planetsData;
-    this.time = 0;
-    this.planetStates = new Map();
-    this.tappedPlanetFeedback = null;
-  }
-
-  setPlanets(planetsData) {
-    this.planets = planetsData;
+  constructor() {
+    this.elapsed = 0;
+    this.previewPhase = 0;
+    this.planetsData = [];
+    this.planetSprings = {}; // { [id]: { scale: 1, rippleR: 0, rippleA: 0 } }
+    this.stations = [];
+    this.width = 800;
+    this.height = 600;
   }
 
   enter() {
-    this.time = 0;
+    this.elapsed = 0;
+    this.previewPhase = 0;
+    this.planetsData = this.sceneManager.game.planetsData.filter(p => p.id !== 'sun');
+
+    for (const p of this.planetsData) {
+      this.planetSprings[p.id] = { scale: 1.0, rippleR: 0, rippleA: 0 };
+    }
+
     this.buildUI();
+    this.updateStationLayout();
+
+    // Set coach expected action on the Playground station
+    if (this.stations.length > 0) {
+      const targetStation = this.stations[0];
+      coach.setExpectedAction({
+        id: 'hub-playground',
+        target: { x: targetStation.x, y: targetStation.y, radius: targetStation.radius, id: 'station-playground' },
+        gesture: 'tap',
+        from: { x: targetStation.x, y: targetStation.y },
+        immediate: false
+      });
+    }
   }
 
   exit() {
-    // UI elements cleared by scene manager
+    coach.clearExpectedAction();
   }
 
   buildUI() {
@@ -43,211 +71,106 @@ export class HubScene {
 
     overlay.innerHTML = `
       <div class="top-bar">
-        <div class="top-bar-left">
-          <span class="scale-badge">${i18n.t('hub.title')}</span>
-        </div>
+        <div class="top-bar-left"></div>
         <div class="top-bar-right">
-          <button id="hub-btn-parent" class="btn-icon" aria-label="${i18n.t('app.parent_gate_button')}" title="${i18n.t('app.parent_gate_button')}">
-            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
-          </button>
-          <button id="hub-btn-mute" class="btn-icon" aria-label="${audio.isMuted ? i18n.t('app.unmute') : i18n.t('app.mute')}">
-            <svg viewBox="0 0 24 24">
-              ${audio.isMuted 
-                ? '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27l4.73 4.73H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>' 
-                : '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>'}
+          <button id="hub-btn-mute" class="btn-icon" aria-label="Mute Audio">
+            <svg viewBox="0 0 24 24" id="mute-svg-icon">
+              ${this.getMuteIconSvg()}
             </svg>
           </button>
         </div>
       </div>
-
-      <div class="hub-doors-container">
-        <!-- Door 1: Meet the Planets -->
-        <button id="door-meet" class="hub-door" aria-label="${i18n.t('hub.meet_door')}">
-          <svg class="hub-door-icon" viewBox="0 0 24 24" fill="#70D6FF">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-          </svg>
-          <span class="hub-door-label">${i18n.t('hub.meet_door')}</span>
-        </button>
-
-        <!-- Door 2: Planet Parade -->
-        <button id="door-parade" class="hub-door" aria-label="${i18n.t('hub.parade_door')}">
-          <svg class="hub-door-icon" viewBox="0 0 24 24" fill="#FFA000">
-            <path d="M4 10.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm3.5-3c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm5-4C10.67 3.5 9 5.17 9 7.25s1.67 3.75 3.5 3.75 3.5-1.67 3.5-3.75S14.33 3.5 12.5 3.5zm7 7c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm-3.5 5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-          </svg>
-          <span class="hub-door-label">${i18n.t('hub.parade_door')}</span>
-        </button>
-      </div>
     `;
-
-    document.getElementById('door-meet').addEventListener('click', () => {
-      audio.playPop();
-      this.sceneManager.switch('meet');
-    });
-
-    document.getElementById('door-parade').addEventListener('click', () => {
-      audio.playPop();
-      this.sceneManager.switch('parade');
-    });
 
     const muteBtn = document.getElementById('hub-btn-mute');
-    muteBtn.addEventListener('click', () => {
-      audio.toggleMute();
-      this.buildUI();
-    });
-
-    // Parent Gate 3-second hold listener
-    const parentBtn = document.getElementById('hub-btn-parent');
-    let holdTimer = null;
-
-    const startHold = () => {
-      parentBtn.classList.add('holding');
-      holdTimer = setTimeout(() => {
-        parentBtn.classList.remove('holding');
-        audio.playPop();
-        this.showArithmeticGate();
-      }, 3000);
-    };
-
-    const cancelHold = () => {
-      if (holdTimer) {
-        clearTimeout(holdTimer);
-        holdTimer = null;
-        parentBtn.classList.remove('holding');
-      }
-    };
-
-    parentBtn.addEventListener('pointerdown', startHold);
-    parentBtn.addEventListener('pointerup', cancelHold);
-    parentBtn.addEventListener('pointerleave', cancelHold);
-    parentBtn.addEventListener('pointercancel', cancelHold);
-  }
-
-  showArithmeticGate() {
-    const a = Math.floor(Math.random() * 5) + 2;
-    const b = Math.floor(Math.random() * 4) + 1;
-    const sum = a + b;
-    const choices = [sum, sum - 1, sum + 2].sort(() => Math.random() - 0.5);
-
-    const overlay = this.sceneManager.uiOverlay;
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-      <div class="confirm-home-dialog">
-        <div class="confirm-home-title">${i18n.t('app.parent_gate_title')}</div>
-        <p style="color:var(--ink-secondary); font-size:1.15rem;">${i18n.t('app.parent_gate_prompt', { a, b })}</p>
-        <div class="gate-choices-row">
-          ${choices.map(c => `<button class="gate-choice-btn" data-val="${c}">${c}</button>`).join('')}
-        </div>
-        <button id="gate-btn-cancel" class="btn-primary" style="margin-top:12px; font-size:1rem; min-height:48px;">${i18n.t('app.close')}</button>
-      </div>
-    `;
-    overlay.appendChild(modal);
-
-    modal.querySelectorAll('.gate-choice-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const val = parseInt(btn.dataset.val, 10);
-        if (val === sum) {
-          audio.playPop();
-          modal.remove();
-          this.showParentCornerModal();
-        } else {
-          audio.playBoop();
-          btn.style.borderColor = '#FF7043';
-          setTimeout(() => {
-            modal.remove();
-            this.showArithmeticGate();
-          }, 350);
-        }
-      });
-    });
-
-    document.getElementById('gate-btn-cancel')?.addEventListener('click', () => {
-      modal.remove();
-    });
-  }
-
-  showParentCornerModal() {
-    const overlay = this.sceneManager.uiOverlay;
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-
-    const currentRung = adaptive.getRung('parade');
-    const reduceMotion = storage.get('profile.reduceMotion', false);
-
-    modal.innerHTML = `
-      <div class="parent-dialog">
-        <h2>${i18n.t('app.parent_corner_title')}</h2>
-        
-        <div class="parent-card-box">
-          <strong>${i18n.t('app.parent_open_question_title')}</strong>
-          <p style="font-size:0.95rem; color:#FFFFFF;">"${i18n.t('app.parent_open_question')}"</p>
-        </div>
-
-        <div class="parent-card-box">
-          <strong>${i18n.t('app.parent_closing_reflection')}</strong>
-        </div>
-
-        <div class="parent-card-box">
-          <strong>${i18n.t('app.parent_parade_rung')}:</strong>
-          <div class="parent-rungs-row">
-            ${[1, 2, 3, 4, 5].map(r => `
-              <button class="parent-rung-btn ${r === currentRung ? 'active' : ''}" data-rung="${r}">${r}</button>
-            `).join('')}
-          </div>
-        </div>
-
-        <div class="parent-card-box" style="flex-direction:row; justify-content:space-between; align-items:center;">
-          <span>${i18n.t('app.parent_reduce_motion')}</span>
-          <input type="checkbox" id="chk-reduce-motion" ${reduceMotion ? 'checked' : ''} style="width:24px; height:24px; cursor:pointer;" />
-        </div>
-
-        <button id="parent-btn-done" class="btn-primary" style="margin-top:8px;">${i18n.t('app.close')}</button>
-      </div>
-    `;
-
-    overlay.appendChild(modal);
-
-    modal.querySelectorAll('.parent-rung-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const r = parseInt(btn.dataset.rung, 10);
-        adaptive.setRung('parade', r);
-        modal.querySelectorAll('.parent-rung-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        audio.playPop();
-      });
-    });
-
-    const chkMotion = document.getElementById('chk-reduce-motion');
-    if (chkMotion) {
-      chkMotion.addEventListener('change', (e) => {
-        storage.set('profile.reduceMotion', e.target.checked);
+    if (muteBtn) {
+      muteBtn.addEventListener('click', () => {
+        audio.toggleMute();
+        const svg = document.getElementById('mute-svg-icon');
+        if (svg) svg.innerHTML = this.getMuteIconSvg();
       });
     }
+  }
 
-    document.getElementById('parent-btn-done')?.addEventListener('click', () => {
-      audio.playPop();
-      modal.remove();
-    });
+  getMuteIconSvg() {
+    return audio.isMuted
+      ? '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27l4.73 4.73H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>'
+      : '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+  }
+
+  updateStationLayout() {
+    const isLandscape = this.width > this.height;
+    const cx = this.width / 2;
+    const cy = this.height / 2;
+    const doorRadius = Math.max(48, Math.min(76, isLandscape ? this.height * 0.16 : this.width * 0.16));
+
+    if (isLandscape) {
+      this.stations = [
+        { id: 'playground', targetScene: 'playground', x: cx - this.width * 0.28, y: cy, radius: doorRadius },
+        { id: 'parade', targetScene: 'parade', x: cx + this.width * 0.28, y: cy, radius: doorRadius }
+      ];
+    } else {
+      this.stations = [
+        { id: 'playground', targetScene: 'playground', x: cx, y: cy - this.height * 0.22, radius: doorRadius },
+        { id: 'parade', targetScene: 'parade', x: cx, y: cy + this.height * 0.22, radius: doorRadius }
+      ];
+    }
   }
 
   handleTap(x, y) {
-    // Check if user tapped Sun
-    if (this.sunPos && InputManager.hitTestCircle(x, y, this.sunPos.x, this.sunPos.y, this.sunPos.radius)) {
-      audio.playTone('G3', 0.4, 'triangle');
-      particles.emit(x, y, { color: '#FFA000', count: 8 });
+    if (transition.isTransitioning) {
+      transition.fastForward(80);
       return true;
     }
 
-    // Check if user tapped any orbiting planet
-    for (const [id, pos] of this.planetStates.entries()) {
-      if (InputManager.hitTestCircle(x, y, pos.x, pos.y, pos.radius)) {
-        const planetData = this.planets.find(p => p.id === id);
-        if (planetData) {
-          audio.playPlanetNote(planetData.freq || planetData.note);
-          particles.emit(pos.x, pos.y, { color: planetData.color || '#FFE082', count: 6 });
-          pos.scalePop = 1.35;
-          return true;
+    // 1. Check Station hits (hit bounds expanded by 40%)
+    for (const st of this.stations) {
+      const hitRadius = st.radius * 1.4;
+      if (Math.hypot(x - st.x, y - st.y) <= hitRadius) {
+        audio.playPop();
+        haptics.tick();
+        transition.startTransition({
+          type: 'hub-to-mode',
+          duration: 550,
+          sharedElement: {
+            fromX: st.x,
+            fromY: st.y,
+            fromR: st.radius
+          },
+          onComplete: () => {
+            this.sceneManager.switch(st.targetScene);
+          }
+        });
+        return true;
+      }
+    }
+
+    // 2. Check Orbiting Background Planets
+    const cx = this.width / 2;
+    const cy = this.height / 2;
+    const baseRadius = Math.min(this.width, this.height) * 0.44;
+
+    for (let i = 0; i < this.planetsData.length; i++) {
+      const p = this.planetsData[i];
+      const orbitR = baseRadius * (0.32 + (i / 7) * 0.65);
+      const pos = calculateOrbitPosition(i + 1, this.elapsed, (i * Math.PI) / 4, cx, cy, orbitR);
+      const planetRadius = Math.max(16, 26 * (p.radius_ratio || 1.0));
+      const hitRadius = planetRadius * 1.4;
+
+      if (Math.hypot(x - pos.x, y - pos.y) <= hitRadius) {
+        // Micro-interaction Tier 1
+        audio.playPlanetNote(p.note);
+        haptics.tick();
+        particles.emit(pos.x, pos.y, { color: p.color, count: 6 });
+
+        // Trigger spring squash & pop
+        const spring = this.planetSprings[p.id];
+        if (spring) {
+          spring.scale = 1.35;
+          spring.rippleR = planetRadius;
+          spring.rippleA = 0.8;
         }
+        return true;
       }
     }
 
@@ -255,77 +178,192 @@ export class HubScene {
   }
 
   update(dt) {
-    this.time += dt;
+    this.elapsed += dt;
+    this.previewPhase += dt;
+
     sunRenderer.update(dt);
     orbiRenderer.update(dt);
     starfield.update(dt);
     particles.update(dt);
+    ghostHand.update(dt);
 
-    // Update scale pops on tapped planets
-    for (const pos of this.planetStates.values()) {
-      if (pos.scalePop && pos.scalePop > 1.0) {
-        pos.scalePop -= dt * 2.0;
-        if (pos.scalePop < 1.0) pos.scalePop = 1.0;
+    // Update planet spring recovery
+    for (const id of Object.keys(this.planetSprings)) {
+      const s = this.planetSprings[id];
+      s.scale += (1.0 - s.scale) * Math.min(1.0, dt * 10);
+      if (s.rippleA > 0) {
+        s.rippleR += dt * 50;
+        s.rippleA -= dt * 1.8;
       }
+    }
+
+    // Orbi looks toward station or touch
+    if (this.stations.length > 0) {
+      const target = this.stations[0];
+      const cx = this.width / 2;
+      const cy = this.height / 2;
+      orbiRenderer.setGazeTarget(target.x, target.y, cx + this.width * 0.15, cy - this.height * 0.12);
     }
   }
 
   render(ctx, width, height) {
+    this.width = width;
+    this.height = height;
+    this.updateStationLayout();
+
+    // Deep cosmic space
     ctx.fillStyle = '#0A0D24';
     ctx.fillRect(0, 0, width, height);
 
+    starfield.resize(width, height);
     starfield.render(ctx);
 
     const cx = width / 2;
     const cy = height / 2;
-    const minDim = Math.min(width, height);
+    const baseRadius = Math.min(width, height) * 0.44;
 
-    // Sun at center
-    const sunRadius = minDim * 0.12;
-    this.sunPos = { x: cx, y: cy, radius: sunRadius };
-    sunRenderer.render(ctx, cx, cy, sunRadius);
-
-    // Render orbits and planets on rails
-    const maxRadius = Math.max(width, height) * 0.46;
-    const minRadius = sunRadius * 1.5;
-    const orbitStep = (maxRadius - minRadius) / 8;
-
-    const planetsToRender = this.planets.filter(p => p.id !== 'sun');
-
-    for (let i = 0; i < planetsToRender.length; i++) {
-      const p = planetsToRender[i];
-      const orbitR = minRadius + i * orbitStep;
-
-      // Draw faint orbit guide rail
+    // 1. Draw Rails Orbit Rings
+    ctx.save();
+    for (let i = 0; i < this.planetsData.length; i++) {
+      const orbitR = baseRadius * (0.32 + (i / 7) * 0.65);
       ctx.beginPath();
       ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(149, 159, 206, 0.12)';
+      ctx.lineWidth = 1.2;
       ctx.stroke();
+    }
+    ctx.restore();
 
-      // Calculate position
-      const phase = (i * 1.25);
-      const coords = calculateOrbitPosition(i + 1, this.time, phase, cx, cy, orbitR);
+    // 2. Center Sun
+    const sunR = Math.min(width, height) * 0.11;
+    sunRenderer.render(ctx, cx, cy, sunR);
 
-      const basePlanetR = Math.max(8, minDim * 0.024 * (p.radius_ratio || 1.0));
-      const currentPos = this.planetStates.get(p.id) || { scalePop: 1.0 };
-      const drawRadius = basePlanetR * (currentPos.scalePop || 1.0);
+    // 3. Orbiting Planets on rails with Sun-directed lighting
+    for (let i = 0; i < this.planetsData.length; i++) {
+      const p = this.planetsData[i];
+      const orbitR = baseRadius * (0.32 + (i / 7) * 0.65);
+      const pos = calculateOrbitPosition(i + 1, this.elapsed, (i * Math.PI) / 4, cx, cy, orbitR);
+      const baseR = Math.max(14, 24 * (p.radius_ratio || 1.0));
+      const spring = this.planetSprings[p.id] || { scale: 1.0, rippleR: 0, rippleA: 0 };
+      const curR = baseR * spring.scale;
 
-      this.planetStates.set(p.id, {
-        x: coords.x,
-        y: coords.y,
-        radius: drawRadius,
-        scalePop: currentPos.scalePop || 1.0
+      // Draw planet
+      planetRenderer.renderPlanet(ctx, p.id, pos.x, pos.y, curR, {
+        spinAngle: this.elapsed * 0.5,
+        windOffset: this.elapsed * 30
       });
 
-      spriteCache.drawCachedPlanet(ctx, p.id, coords.x, coords.y, drawRadius);
+      // Apply dynamic lighting from the Sun
+      lighting.applyLighting(ctx, p.id, pos.x, pos.y, curR, cx, cy);
+
+      // Planet ripple ring when tapped
+      if (spring.rippleA > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, spring.rippleR, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 224, 130, ${spring.rippleA})`;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
-    // Orbi floating near bottom right
-    const orbiX = width * 0.82;
-    const orbiY = height * 0.78;
-    orbiRenderer.render(ctx, orbiX, orbiY, 56, 'idle');
+    // 4. Companion Orbi floating in inner orbit
+    const orbiX = cx + width * 0.18;
+    const orbiY = cy - height * 0.14;
+    const coachState = coach.state;
+    const orbiPose = coachState.orbiLooking ? 'look-at-target' : 'idle';
+    orbiRenderer.render(ctx, orbiX, orbiY, 62, orbiPose);
 
+    // 5. Particles
     particles.render(ctx);
+
+    // 6. Two Live-Preview Station Doors (NO text labels!)
+    for (const st of this.stations) {
+      this.renderStation(ctx, st);
+    }
+
+    // 7. Coach Ghost Hand invitation if idle ladder reached
+    if (coachState.showGhostHand && coach.getTarget()) {
+      ghostHand.render(ctx, coach.getTarget());
+    }
+  }
+
+  renderStation(ctx, st) {
+    ctx.save();
+
+    // Idle breathing (scale 1.0 to 1.03)
+    const breathe = Math.sin(this.previewPhase * 1.8 + (st.id === 'parade' ? Math.PI : 0)) * 0.025;
+    const r = st.radius * (1.0 + breathe);
+
+    // Outer glow / halo
+    const halo = ctx.createRadialGradient(st.x, st.y, r * 0.7, st.x, st.y, r * 1.35);
+    halo.addColorStop(0, 'rgba(112, 214, 255, 0.35)');
+    halo.addColorStop(1, 'rgba(112, 214, 255, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(st.x, st.y, r * 1.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Station door portal background
+    const bgGrad = ctx.createRadialGradient(st.x - r * 0.3, st.y - r * 0.3, r * 0.1, st.x, st.y, r);
+    bgGrad.addColorStop(0, '#242E6B');
+    bgGrad.addColorStop(1, '#0F143A');
+
+    ctx.beginPath();
+    ctx.arc(st.x, st.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = bgGrad;
+    ctx.fill();
+
+    // Golden / cyan border ring
+    ctx.strokeStyle = '#70D6FF';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+
+    // Clip inner content to circular station boundary
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(st.x, st.y, r - 3, 0, Math.PI * 2);
+    ctx.clip();
+
+    // LIVE PREVIEWS:
+    if (st.id === 'playground') {
+      // Live Preview: A spinning Earth with a tiny translucent hand spinning it
+      const previewPlanetR = r * 0.46;
+      planetRenderer.renderPlanet(ctx, 'earth', st.x, st.y, previewPlanetR, {
+        spinAngle: this.previewPhase * 1.5
+      });
+      lighting.applyLighting(ctx, 'earth', st.x, st.y, previewPlanetR, st.x - r, st.y);
+
+      // Tiny hand gesture spinning it
+      const handAngle = this.previewPhase * 2.0;
+      const hx = st.x + Math.cos(handAngle) * (previewPlanetR * 0.85);
+      const hy = st.y + Math.sin(handAngle) * (previewPlanetR * 0.4);
+      ghostHand.drawHandShape(ctx, hx, hy, 0.48, 0.85, true);
+    } else if (st.id === 'parade') {
+      // Live Preview: Tiny planets hopping into a row runway
+      const slotSpacing = r * 0.48;
+      const startX = st.x - slotSpacing;
+      const hopIds = ['mercury', 'venus', 'earth'];
+
+      for (let i = 0; i < 3; i++) {
+        const px = startX + i * slotSpacing;
+        const hop = Math.abs(Math.sin(this.previewPhase * 3.5 + i * 0.8)) * 12;
+        const py = st.y + r * 0.1 - hop;
+        const pR = 11 + i * 2.5;
+
+        // Faint slot beneath
+        ctx.beginPath();
+        ctx.arc(px, st.y + r * 0.14, pR + 3, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        planetRenderer.renderPlanet(ctx, hopIds[i], px, py, pR, {});
+      }
+    }
+
+    ctx.restore();
+    ctx.restore();
   }
 }

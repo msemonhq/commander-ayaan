@@ -1,8 +1,10 @@
 /**
  * Scene Manager (js/core/scenes.js).
- * Coordinates scene lifecycle (enter, exit, update, render, pointer events).
+ * Coordinates scene lifecycle (enter, exit, update, render, gestures).
+ * Bridges with TransitionCoordinator for non-blocking shared transitions.
  */
 import { events } from './events.js';
+import { transition } from '../render/transition.js';
 
 export class SceneManager {
   constructor(uiOverlayElement) {
@@ -10,6 +12,7 @@ export class SceneManager {
     this.scenes = new Map();
     this.currentScene = null;
     this.currentSceneName = null;
+    this.game = null;
   }
 
   register(name, sceneInstance) {
@@ -40,6 +43,7 @@ export class SceneManager {
   }
 
   update(dt) {
+    transition.update(dt * 1000);
     if (this.currentScene) {
       this.currentScene.update(dt);
     }
@@ -48,6 +52,10 @@ export class SceneManager {
   render(ctx, width, height, alpha) {
     if (this.currentScene) {
       this.currentScene.render(ctx, width, height, alpha);
+    }
+    // Render transition overlay on top if active
+    if (transition.isTransitioning) {
+      transition.render(ctx, width, height);
     }
   }
 
@@ -58,15 +66,38 @@ export class SceneManager {
     return false;
   }
 
-  handleDrag(x, y, dx, dy) {
-    if (this.currentScene && this.currentScene.handleDrag) {
-      this.currentScene.handleDrag(x, y, dx, dy);
+  handleHold(point) {
+    if (this.currentScene && this.currentScene.handleHold) {
+      return this.currentScene.handleHold(point);
     }
+    return false;
   }
 
-  handleDragEnd(x, y) {
-    if (this.currentScene && this.currentScene.handleDragEnd) {
-      this.currentScene.handleDragEnd(x, y);
+  handleDragStart(dragInfo) {
+    if (this.currentScene && this.currentScene.handleDragStart) {
+      return this.currentScene.handleDragStart(dragInfo);
     }
+    return false;
+  }
+
+  handleDragMove(dragInfo) {
+    if (this.currentScene && this.currentScene.handleDrag) {
+      return this.currentScene.handleDrag(dragInfo);
+    }
+    return false;
+  }
+
+  handleDragEnd(dragInfo) {
+    if (this.currentScene && this.currentScene.handleDragEnd) {
+      return this.currentScene.handleDragEnd(dragInfo);
+    }
+    return false;
+  }
+
+  handleFlick(flickInfo) {
+    if (this.currentScene && this.currentScene.handleFlick) {
+      return this.currentScene.handleFlick(flickInfo);
+    }
+    return false;
   }
 }

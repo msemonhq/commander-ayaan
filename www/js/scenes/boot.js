@@ -1,132 +1,159 @@
 /**
- * Boot Screen Scene (js/scenes/boot.js).
- * Rising Sun behind Earth, Orbi floats in, "Tap to Start" unlocks WebAudio.
- * Duration <= 2 seconds, immediately skippable by tap.
+ * Wordless Boot Screen Scene (js/scenes/boot.js).
+ * Strictly wordless:
+ * - Softly glowing Sun in the center with a gentle pulsing ring
+ * - Translucent ghost hand demonstrating the tap
+ * - Touch anywhere starts the game, unlocks WebAudio
+ * - Animated intro (Sun blooms, camera pulls back, Orbi floats in)
+ * - Duration <= 1.8 seconds, instantly skippable by a touch
  */
 import { sunRenderer } from '../render/sun.js';
 import { orbiRenderer } from '../render/orbi.js';
 import { starfield } from '../render/stars.js';
 import { planetRenderer } from '../render/planet.js';
+import { ghostHand } from '../render/hand.js';
 import { audio } from '../core/audio.js';
-import { i18n } from '../core/i18n.js';
+import { coach } from '../systems/coach.js';
+import { transition } from '../render/transition.js';
+import { Easings } from '../core/tween.js';
 
 export class BootScene {
   constructor() {
     this.elapsed = 0;
-    this.maxDuration = 2.0; // 2 seconds animation
-    this.sunProgress = 0;
-    this.orbiX = 0;
-    this.orbiY = 0;
-    this.started = false;
+    this.isStarting = false;
+    this.introElapsed = 0;
+    this.introDuration = 1.6; // seconds
+    this.width = 800;
+    this.height = 600;
   }
 
   enter() {
     this.elapsed = 0;
-    this.started = false;
-    this.buildUI();
+    this.isStarting = false;
+    this.introElapsed = 0;
+
+    // Register immediate coach action on the Sun so ghost hand shows tap
+    const cx = this.width / 2;
+    const cy = this.height / 2;
+    coach.setExpectedAction({
+      id: 'boot-sun',
+      target: { x: cx, y: cy, radius: 52, id: 'boot-sun' },
+      gesture: 'tap',
+      from: { x: cx, y: cy },
+      immediate: true
+    });
+
+    // Clear UI overlay - wordless
+    if (this.sceneManager && this.sceneManager.uiOverlay) {
+      this.sceneManager.uiOverlay.innerHTML = '';
+    }
   }
 
   exit() {
-    // UI elements cleared by scene manager
-  }
-
-  buildUI() {
-    const overlay = this.sceneManager.uiOverlay;
-    if (!overlay) return;
-
-    overlay.innerHTML = `
-      <div class="top-bar">
-        <div class="top-bar-left">
-          <span class="scale-badge">${i18n.t('app.title')}</span>
-        </div>
-        <div class="top-bar-right">
-          <button id="boot-btn-mute" class="btn-icon" aria-label="${audio.isMuted ? i18n.t('app.unmute') : i18n.t('app.mute')}">
-            <svg viewBox="0 0 24 24">
-              ${audio.isMuted 
-                ? '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27l4.73 4.73H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>' 
-                : '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>'}
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div style="position:absolute; bottom: 18%; left: 50%; transform: translateX(-50%); pointer-events: auto; text-align: center;">
-        <button id="btn-boot-start" class="btn-primary" aria-label="${i18n.t('app.boot_cta')}">
-          ${i18n.t('app.boot_cta')}
-        </button>
-      </div>
-    `;
-
-    const startBtn = document.getElementById('btn-boot-start');
-    if (startBtn) {
-      startBtn.addEventListener('click', () => this.handleStart());
-    }
-
-    const muteBtn = document.getElementById('boot-btn-mute');
-    if (muteBtn) {
-      muteBtn.addEventListener('click', () => {
-        audio.toggleMute();
-        this.buildUI();
-      });
-    }
-  }
-
-  handleStart() {
-    if (this.started) return;
-    this.started = true;
-    audio.unlock();
-    audio.playPop();
-    this.sceneManager.switch('hub');
+    coach.clearExpectedAction();
   }
 
   handleTap(x, y) {
-    this.handleStart();
-    return true;
+    if (!this.isStarting) {
+      this.isStarting = true;
+      audio.unlock();
+      audio.playPop();
+      coach.clearExpectedAction();
+      transition.startTransition({
+        type: 'boot-to-hub',
+        duration: 1600,
+        onComplete: () => {
+          this.sceneManager.switch('hub');
+        }
+      });
+      return true;
+    } else {
+      // Touch during transition immediately fast-forwards into Hub
+      transition.fastForward(80);
+      return true;
+    }
   }
 
   update(dt) {
     this.elapsed += dt;
-    this.sunProgress = Math.min(1.0, this.elapsed / 1.6);
     sunRenderer.update(dt);
     orbiRenderer.update(dt);
     starfield.update(dt);
+    ghostHand.update(dt);
+
+    if (this.isStarting) {
+      this.introElapsed += dt;
+      if (this.introElapsed >= this.introDuration) {
+        this.sceneManager.switch('hub');
+      }
+    }
   }
 
   render(ctx, width, height) {
-    // Clear space background
+    this.width = width;
+    this.height = height;
+
+    // Deep cosmic space
     ctx.fillStyle = '#0A0D24';
     ctx.fillRect(0, 0, width, height);
 
-    // Parallax stars
+    starfield.resize(width, height);
     starfield.render(ctx);
 
     const cx = width / 2;
     const cy = height / 2;
 
-    // Rising Sun from bottom edge
-    const sunTargetY = height * 0.72;
-    const sunStartY = height + 100;
-    const sunY = sunStartY + (sunTargetY - sunStartY) * Math.sin(this.sunProgress * Math.PI * 0.5);
-    sunRenderer.render(ctx, cx, sunY, Math.min(width, height) * 0.38);
+    if (!this.isStarting) {
+      // 1. Initial State: Center glowing Sun with pulsing invite ring
+      const sunR = Math.min(width, height) * 0.12;
+      sunRenderer.render(ctx, cx, cy, sunR);
 
-    // Earth floating in foreground
-    const earthRadius = Math.min(width, height) * 0.12;
-    planetRenderer.renderPlanet(ctx, 'earth', cx - width * 0.22, height * 0.45, earthRadius, {});
+      // Gentle pulsing invitation ring
+      const pulsePhase = (this.elapsed * 2.5) % (Math.PI * 2);
+      const ringR = sunR * (1.25 + 0.15 * Math.sin(pulsePhase));
+      const ringAlpha = 0.4 + 0.25 * Math.cos(pulsePhase);
 
-    // Orbi floating in from top right
-    const orbiTargetX = cx + width * 0.2;
-    const orbiTargetY = height * 0.35;
-    const orbiStartX = width + 80;
-    const orbiX = orbiStartX + (orbiTargetX - orbiStartX) * Math.min(1.0, this.elapsed / 1.2);
-    orbiRenderer.render(ctx, orbiX, orbiTargetY, 72, 'cheer');
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 224, 130, ${ringAlpha})`;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
 
-    // Title text: Commander Ayaan
-    ctx.save();
-    ctx.font = '800 clamp(28px, 6vw, 48px) var(--font-display, sans-serif)';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(255, 179, 0, 0.6)';
-    ctx.shadowBlur = 16;
-    ctx.fillText('Commander Ayaan', cx, height * 0.22);
-    ctx.restore();
+      // Translucent ghost hand tapping the Sun
+      const coachTarget = coach.getTarget();
+      if (coachTarget) {
+        ghostHand.render(ctx, coachTarget);
+      }
+    } else {
+      // 2. Intro Transition State: Sun blooms, camera pulls back, Earth & Orbi glide in
+      const p = Math.min(1.0, this.introElapsed / this.introDuration);
+      const ease = Easings.out(p);
+
+      // Sun blooms and moves to its Hub position
+      const sunTargetY = height * 0.5;
+      const sunTargetR = Math.min(width, height) * 0.15;
+      const curSunY = cy + (sunTargetY - cy) * ease;
+      const curSunR = (Math.min(width, height) * 0.12) + (sunTargetR - Math.min(width, height) * 0.12) * ease;
+      sunRenderer.render(ctx, cx, curSunY, curSunR);
+
+      // Earth flies out to its orbit
+      const earthRadius = Math.min(width, height) * 0.055;
+      const earthTargetX = cx - width * 0.28;
+      const earthTargetY = cy + height * 0.15;
+      const earthX = cx + (earthTargetX - cx) * ease;
+      const earthY = cy + (earthTargetY - cy) * ease;
+      planetRenderer.renderPlanet(ctx, 'earth', earthX, earthY, earthRadius, {});
+
+      // Orbi floats in on a curved glide from top-right
+      const orbiStartX = width + 60;
+      const orbiStartY = -40;
+      const orbiTargetX = cx + width * 0.26;
+      const orbiTargetY = cy - height * 0.18;
+      const orbiX = orbiStartX + (orbiTargetX - orbiStartX) * ease;
+      const orbiY = orbiStartY + (orbiTargetY - orbiStartY) * ease;
+      orbiRenderer.render(ctx, orbiX, orbiY, 68, 'cheer');
+    }
   }
 }

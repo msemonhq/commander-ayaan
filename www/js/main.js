@@ -1,11 +1,15 @@
 /**
  * Commander Ayaan - Main Entry Point (js/main.js).
  * Coordinates canvas initialization, scene manager, game loop,
- * background pause/resume, and non-production test hooks.
+ * gestures recognizer, shared motion engine, coach assistance,
+ * and test hooks for automated verification.
  */
 import { GameLoop } from './core/loop.js';
 import { SceneManager } from './core/scenes.js';
-import { InputManager } from './core/input.js';
+import { GestureRecognizer } from './core/gestures.js';
+import { tweenEngine } from './core/tween.js';
+import { transition } from './render/transition.js';
+import { coach } from './systems/coach.js';
 import { audio } from './core/audio.js';
 import { i18n } from './core/i18n.js';
 import { storage } from './core/storage.js';
@@ -17,10 +21,10 @@ import { hints } from './systems/hints.js';
 import { rewards } from './systems/rewards.js';
 import { session } from './systems/session.js';
 
-// Scenes
+// Scenes for Phase 1
 import { BootScene } from './scenes/boot.js';
 import { HubScene } from './scenes/hub.js';
-import { MeetScene } from './scenes/meet.js';
+import { PlaygroundScene } from './scenes/playground.js';
 import { ParadeScene } from './scenes/parade.js';
 
 async function init() {
@@ -73,22 +77,29 @@ async function init() {
 
   // Instantiate systems
   const sceneManager = new SceneManager(uiOverlay);
-  const inputManager = new InputManager(canvas);
+  const gestures = new GestureRecognizer(canvas);
+
+  sceneManager.game = { planetsData, missionsData };
 
   const bootScene = new BootScene();
-  const hubScene = new HubScene(planetsData);
-  const meetScene = new MeetScene(planetsData);
-  const paradeScene = new ParadeScene(planetsData, missionsData);
+  const hubScene = new HubScene();
+  const playgroundScene = new PlaygroundScene();
+  const paradeScene = new ParadeScene();
 
   sceneManager.register('boot', bootScene);
   sceneManager.register('hub', hubScene);
-  sceneManager.register('meet', meetScene);
+  sceneManager.register('playground', playgroundScene);
   sceneManager.register('parade', paradeScene);
 
-  // Bind input handlers
-  inputManager.onTap = (x, y) => sceneManager.handleTap(x, y);
-  inputManager.onDrag = (x, y, dx, dy) => sceneManager.handleDrag(x, y, dx, dy);
-  inputManager.onDragEnd = (x, y) => sceneManager.handleDragEnd(x, y);
+  // Wire up gestures to current scene
+  gestures.setHandlers({
+    onTap: (point) => sceneManager.handleTap(point.x, point.y),
+    onHold: (point) => sceneManager.handleHold(point),
+    onDragStart: (dragInfo) => sceneManager.handleDragStart(dragInfo),
+    onDragMove: (dragInfo) => sceneManager.handleDragMove(dragInfo),
+    onDragEnd: (dragInfo) => sceneManager.handleDragEnd(dragInfo),
+    onFlick: (flickInfo) => sceneManager.handleFlick(flickInfo)
+  });
 
   // Background pause & resume handling
   document.addEventListener('visibilitychange', () => {
@@ -97,6 +108,15 @@ async function init() {
     } else {
       audio.resume();
     }
+  });
+
+  // Check OS reduce-motion preference
+  const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  tweenEngine.setReduceMotion(mediaQuery.matches);
+  transition.setReduceMotion(mediaQuery.matches);
+  mediaQuery.addEventListener('change', (e) => {
+    tweenEngine.setReduceMotion(e.matches);
+    transition.setReduceMotion(e.matches);
   });
 
   // Android Back Button Confirmation Modal ("Go home?" with two picture buttons)
@@ -108,103 +128,52 @@ async function init() {
     modal.className = 'modal-overlay confirm-home-overlay';
     modal.innerHTML = `
       <div class="confirm-home-dialog">
-        <div class="confirm-home-title">${i18n.t('app.confirm_home_title')}</div>
         <div class="confirm-home-actions">
-          <button id="btn-back-yes" class="btn-picture-action btn-picture-yes" aria-label="${i18n.t('app.confirm_home_yes')}">
+          <button id="btn-back-yes" class="btn-picture-action btn-picture-yes" aria-label="Home">
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
             </svg>
-            <span>${i18n.t('app.confirm_home_yes')}</span>
           </button>
-          <button id="btn-back-no" class="btn-picture-action btn-picture-no" aria-label="${i18n.t('app.confirm_home_no')}">
+          <button id="btn-back-no" class="btn-picture-action btn-picture-no" aria-label="Resume">
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z"/>
             </svg>
-            <span>${i18n.t('app.confirm_home_no')}</span>
           </button>
         </div>
       </div>
     `;
     uiOverlay.appendChild(modal);
 
-    document.getElementById('btn-back-yes').addEventListener('click', () => {
+    document.getElementById('btn-back-yes')?.addEventListener('click', () => {
       audio.playPop();
       modal.remove();
       sceneManager.switch('hub');
     });
 
-    document.getElementById('btn-back-no').addEventListener('click', () => {
+    document.getElementById('btn-back-no')?.addEventListener('click', () => {
       audio.playPop();
       modal.remove();
     });
   }
 
-  // Hook up Capacitor Back Button if running inside native app or keyboard/popstate
-  if (typeof window !== 'undefined') {
-    window.addEventListener('popstate', () => showConfirmHomeDialog());
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') showConfirmHomeDialog();
-    });
-
-    try {
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
-        window.Capacitor.Plugins.App.addListener('backButton', () => showConfirmHomeDialog());
-      }
-    } catch {}
-  }
-
-  // Session Pacing Reminder: "Orbi needs a rest"
-  function showRestNeededDialog() {
-    if (document.querySelector('.rest-dialog-overlay')) return;
-
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay rest-dialog-overlay';
-    modal.innerHTML = `
-      <div class="confirm-home-dialog" style="max-width:460px;">
-        <div class="confirm-home-title">${i18n.t('app.rest_title')}</div>
-        <p style="color:var(--ink-secondary); font-size:1.1rem; line-height:1.4;">${i18n.t('app.rest_message')}</p>
-        <div class="confirm-home-actions">
-          <button id="btn-rest-stop" class="btn-picture-action btn-picture-yes" aria-label="${i18n.t('app.rest_finish')}">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
-            </svg>
-            <span>${i18n.t('app.rest_finish')}</span>
-          </button>
-          <button id="btn-rest-continue" class="btn-picture-action btn-picture-no" aria-label="${i18n.t('app.rest_continue')}">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-            <span>${i18n.t('app.rest_continue')}</span>
-          </button>
-        </div>
-      </div>
-    `;
-    uiOverlay.appendChild(modal);
-
-    document.getElementById('btn-rest-stop').addEventListener('click', () => {
-      audio.playPop();
-      modal.remove();
-      sceneManager.switch('hub');
-    });
-
-    document.getElementById('btn-rest-continue').addEventListener('click', () => {
-      audio.playPop();
-      modal.remove();
-    });
-  }
-
-  events.on('session:rest_needed', () => showRestNeededDialog());
+  // Hook up back button
+  window.addEventListener('popstate', () => showConfirmHomeDialog());
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') showConfirmHomeDialog();
+  });
 
   // Game Loop
   const loop = new GameLoop(
     (dt) => {
-      inputManager.updateRipples(dt);
+      gestures.updateRipples(dt);
+      tweenEngine.update(dt * 1000);
+      coach.update(dt);
       sceneManager.update(dt);
     },
     (alpha) => {
       ctx.save();
       sceneManager.render(ctx, width, height, alpha);
-      inputManager.renderRipples(ctx);
+      gestures.renderRipples(ctx);
       ctx.restore();
     }
   );
@@ -218,22 +187,71 @@ async function init() {
   window.__game = {
     sceneManager,
     loop,
-    inputManager,
+    gestures,
     audio,
     storage,
     adaptive,
     hints,
     rewards,
     i18n,
+    coach,
     planetsData,
+    tweenEngine,
+    transition,
+    getCoachTarget: () => coach.getTarget(),
+    touchCoachTarget: () => {
+      const target = coach.getTarget();
+      if (!target) return false;
+      if (target.gesture === 'drag' && target.from && target.to) {
+        sceneManager.handleTap(target.from.x, target.from.y);
+        sceneManager.handleTap(target.to.x, target.to.y);
+      } else {
+        sceneManager.handleTap(target.x, target.y);
+      }
+      return true;
+    },
+    touchEntity: (id) => {
+      // Find entity in current scene and simulate tap
+      const cur = sceneManager.currentScene;
+      if (!cur) return false;
+      if (cur.slots) {
+        const slot = cur.slots.find(s => s.planetId === id || s.id === id);
+        if (slot) return cur.handleTap(slot.x, slot.y);
+      }
+      if (cur.tray) {
+        const item = cur.tray.find(t => t.id === id);
+        if (item) return cur.handleTap(item.x, item.y);
+      }
+      if (cur.stations) {
+        const st = cur.stations.find(s => s.id === id || s.targetScene === id);
+        if (st) return cur.handleTap(st.x, st.y);
+      }
+      return false;
+    },
+    hideAllText: (hidden) => {
+      if (hidden) {
+        document.body.classList.add('wordless-mode');
+        document.querySelectorAll('span, p, h1, h2, h3, button span').forEach(el => {
+          el.style.visibility = 'hidden';
+        });
+      } else {
+        document.body.classList.remove('wordless-mode');
+        document.querySelectorAll('span, p, h1, h2, h3, button span').forEach(el => {
+          el.style.visibility = '';
+        });
+      }
+    },
+    advanceClock: (ms) => {
+      const dt = ms / 1000;
+      loop.update(dt);
+    },
     switchScene: (name, params) => sceneManager.switch(name, params),
     getCurrentScene: () => sceneManager.currentSceneName,
     getP95FrameTime: () => loop.getP95FrameTime(),
-    showConfirmHomeDialog,
-    showRestNeededDialog
+    showConfirmHomeDialog
   };
 
-  console.log('Commander Ayaan initialized successfully.');
+  console.log('Commander Ayaan V2 initialized successfully.');
 }
 
 window.addEventListener('DOMContentLoaded', init);

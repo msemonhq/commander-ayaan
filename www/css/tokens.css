@@ -26,7 +26,7 @@
   --card-border: rgba(149, 159, 206, 0.28);
   --card-glow: rgba(255, 179, 0, 0.22);
   
-  /* Touch & Feedback Tokens */
+  /* Touch & Feedback Tokens - >= 72dp requirement */
   --min-touch-size: 72px;
   --min-touch-gap: 12px;
   --radius-full: 9999px;
@@ -44,12 +44,20 @@
   --fs-hint: 0.95rem;
 
   /* Durations */
+  --t-instant: 100ms;
   --t-micro: 150ms;
   --t-quick: 200ms;
-  --t-medium: 400ms;
+  --t-medium: 350ms;
+  --t-transition: 550ms;
   --t-slow: 800ms;
   --t-round: 1500ms;
   --t-milestone: 3000ms;
+
+  /* Named Easings */
+  --ease-out: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --ease-in: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+  --ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   
   /* Safe Area Insets for Mobile Notches */
   --safe-top: env(safe-area-inset-top, 0px);

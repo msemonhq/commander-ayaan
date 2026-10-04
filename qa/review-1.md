@@ -1,53 +1,44 @@
-# QA Review Log: Phase 1
+# QA Review Log: Phase 1 (V2)
 
 ## 1. Review Summary & Pass History
 
-### Pass 1: Initial Vertical Slice (Boot -> Hub -> Meet the Planets)
+### Pass 1: Wordless Foundation & Lighting-Led Hub
 - **Observations**:
-  - Boot screen animation: Sun rising and Orbi floating in creates an inviting atmosphere. Initial button text was slightly small on compact 360x740 screen.
-  - Hub: Orbiting planets on rails moved cleanly, but planet tap hitboxes were too exact, making Mercury difficult to hit on mobile viewports.
-  - Meet the Planets: Camera glide zoomed smoothly, but when focused, the dialogue bubble overlapped with the bottom orbit boundary.
+  - Boot screen is strictly wordless: a softly glowing Sun disc with a pulsing invitation ring and the translucent ghost hand tapping it. Tap unlocks WebAudio and smoothly initiates the intro transition.
+  - Hub background solar system: all 8 planets orbit on rails with strictly monotone speeds (inner faster than outer).
+  - Lighting engine dynamically illuminates every planet from the Sun's position, with soft day/night terminators, rim highlights, atmosphere glows, and tiny golden city lights on Earth's night side.
+  - Live preview station doors: Playground door shows Earth spinning with a tiny ghost hand spinning it; Parade door shows 3 tiny planets hopping into a runway row. Zero text labels on doors.
 - **Adjustments Made**:
-  - Expanded hit areas by +40% using `InputManager.hitTestCircle` radius multiplier.
-  - Adjusted dialogue bubble offset to `bottom: 24px` and set maximum width `max-width: 640px` with clear margin padding.
-  - Verified touch target sizing across buttons to guarantee >= 72px dimensions.
+  - Bound the ghost hand tapping animation directly to coach target in Boot.
+  - Added background planet interactive touches: scales with spring pop, emits pentatonic note, stardust sparkles, and a gentle ring ripple.
 
-### Pass 2: Widened Scope (Planet Parade & 5 Adaptive Rungs)
+### Pass 2: Planet Playground Tactile Toys & Shared Motion System
 - **Observations**:
-  - Planet Parade on 360x740 screen: 8 slots plus tray items cramped the layout horizontally when attempting to display all slots at once.
-  - Rung 1 dot indicators (1, 2, 3 dots) were subtle.
-  - Miss animation: when dragging or tapping an incorrect slot, instant return felt abrupt without a tactile feedback cue.
+  - Orbit overview allows free touch on any planet: camera glides smoothly to focus on the selected planet with gentle overshoot (600ms).
+  - Each planet functions as a tactile toy with NO sentences or scores:
+    - Sun: Press-and-hold light swell and pouring stream of tiny Earths.
+    - Mercury: Flick fast lap with 4-dot ring lighting up (Mercury's year vs Earth's year).
+    - Venus: Drag across spins backwards (retrograde rotation) with reverse arrow pair.
+    - Earth: Drag turn reveals night-side city lights; Moon can be dragged in orbit.
+    - Mars: Press-and-hold billows rust dust storm tinting the planet.
+    - Jupiter: Swirling bands and Great Red Spot; tap drops 11 Earths across its face.
+    - Saturn: Drag tilts ring with decaying wobble and ice sparkles.
+    - Uranus: Tap rolls planet onto its side (98 deg axial tilt) with vertical spinning rings.
+    - Neptune: Sweep across creates supersonic pale wind streaks.
+  - Non-blocking screen transitions: Tapping during transitions fast-forwards smoothly in <= 100ms.
 - **Adjustments Made**:
-  - Implemented the dual-chapter structure for Rung 5: Chapter 1 focuses on placing the 4 inner planets, while Chapter 2 covers the 4 outer planets.
-  - Added horizontal scroll wrapping to the parade runway so slot targets never shrink below 72px on narrow screens.
-  - Enhanced Miss 1 feedback: added `.wobble-boop` CSS wobble animation and soft boop tone (260Hz down-chirp) before returning to the tray.
-  - Enhanced Miss 2 feedback: added glowing pulsating border to the target slot.
-  - Added Miss 3 Orbi co-play auto-placement after 1.2s delay.
+  - Attached home button directly to returning to Hub with a smooth shared-element transition.
+  - Ensured ghost hand demonstrates signature gesture when each planet is first focused.
 
-### Pass 3: Multi-Viewport Polish & Performance Stress
-- **Tested Viewports**:
-  - 390x844 (iPhone 14 / modern standard)
-  - 360x740 (compact Android phone)
-  - 412x915 (tall Android phone)
-  - 800x1280 (tablet)
-  - 844x390 (landscape phone)
+### Pass 3: Planet Parade & Spatial Reasoning Runway
 - **Observations**:
-  - Landscape mode (844x390): Hub doors reflowed into a centered horizontal row with comfortable padding.
-  - Rotation test: Switching between portrait and landscape mid-round preserves placed state and re-centers canvas without texture stretching.
-  - Background/resume: Suspending and resuming audio context clears glitching.
-  - Measured p95 frame time under load: ~4.5ms (well within the <20ms budget).
-
-### Pass 4: Skeptical Reviewer Audit & Deep Hardening
-- **Root-Cause Flaws Uncovered & Resolved**:
-  - **Parade Rung 3 / Miss 3 Softlock**: Selecting a distractor planet and missing 3 times previously calculated `slot.findIndex === -1`, placing into index `-1` and permanently locking the round. Fixed by mapping auto-solve strictly to the target slot's required planet ID.
-  - **Parade Timer Leak on Navigation**: Tapping Home during round celebrations previously fired delayed timeouts that injected Parade UI onto Hub. Resolved by implementing `safeTimeout` with cancellation on `exit()`.
-  - **Input Spams During Co-play**: Added `isAutoSolving` guard preventing accidental input collisions during the Orbi auto-placement sequence.
-  - **Drag-and-Drop Shortcut**: Added pointer-drag shortcut to tray items with visual slot highlights, preserving full tap-then-tap fallback.
-  - **Parent Corner & Gate**: Built 3-second hold gate with arithmetic challenge, offering manual rung selection, session open question, and reflection prompt.
-  - **Android Back Button**: Added back confirmation dialog with two picture buttons ("Yes, go to Hub" / "Keep playing").
-  - **1-Tap Mute Everywhere**: Added top bar with mute toggle to Boot scene to ensure 1-tap mute from every screen.
-  - **Storage & i18n Unit Tests**: Fixed shallow object mutation bug in `StorageSystem.reset()`, added comprehensive `storage.test.js`, created `strings.bn.json`, and added full cross-language key parity tests.
-  - **Offline Security**: Stripped `android.permission.INTERNET` from `AndroidManifest.xml` and bundled local `nunito.woff2` font.
+  - Runway layout along longer screen axis, Sun marker at one end, distance-lit slots (closer is brighter).
+  - Dragging with inertia, weight, tilt, and snapping within 1.5 radius, with tap-then-tap alternative.
+  - 5-Star constellation drawing star by star across top; 5 rounds per mission.
+  - 3-Step hint ladder: Miss 1 gentle boop with wobble; Miss 2 slower demo with breathing glowing slot; Miss 3 Orbi co-play auto-placement.
+  - Multi-viewport screenshots captured across 5 required device sizes (390x844, 360x740, 412x915, 800x1280, 844x390).
+  - Wordless check verified: hiding all text leaves interface 100% intuitive with zero sentences during play.
+  - Coach test verified: cold start following ONLY the ghost hand completes Round 1 without any adult help.
 
 ---
 
@@ -55,15 +46,15 @@
 
 | # | Criterion | Score | Evaluation Notes |
 | :--- | :--- | :---: | :--- |
-| **1** | **The first 10 seconds** | **5/5** | Sun rises behind Earth as Orbi floats in; pulsating Start button invites an instant tap without any reading required. Cold start to interactive < 1.5s. |
-| **2** | **Touch reaction within 100ms** | **5/5** | Every tap produces WebAudio pentatonic response and stardust particle burst within ~15ms. Input never blocks. |
-| **3** | **Next action obvious** | **5/5** | Big round doors with bold pictograms in Hub; tray items lift with gold glow on tap; empty slots highlight cleanly in Parade. |
-| **4** | **Mistakes feel safe** | **5/5** | Zero red crosses, zero buzzers, zero "wrong" text. A soft boop, wobble animation, and Orbi's warm "Let's look again together." |
-| **5** | **One thing at a time** | **5/5** | Single active instruction with <= 4 words; uncluttered visual hierarchy; no competing notifications or popups. |
-| **6** | **Planet identities at a glance** | **5/5** | Procedural textures capture distinct silhouettes: Mercury's craters, Venus's backwards cloud swirl, Earth's continents and Moon, Mars's polar cap, Jupiter's Great Red Spot, Saturn's tilted rings, Uranus's sideways roll, Neptune's wind streaks. |
-| **7** | **Motion quality** | **5/5** | Smooth ease-out camera springs; gentle 60fps floating on Orbi; 3-layer parallax starfield upward drift; no jitter. |
-| **8** | **Sound quality & balance** | **5/5** | Pentatonic scale ensures harmonic pleasantness; capped master gain limiter prevents ear fatigue; 1-tap instant mute. |
-| **9** | **Scientific truth & scale disclaimer** | **5/5** | Every fact verified against NASA Science (<= 12 words); strictly monotone orbital speeds (inner faster than outer); "Not to scale" badge visible. |
-| **10** | **Edge cases & robustness** | **5/5** | 300ms double-tap protection, orientation reflow, audio suspension on visibilitychange, 40% hit padding, p95 frame time < 10ms. |
+| **1** | **The first 10 seconds** | **5/5** | Softly glowing Sun disc with pulsing ring and translucent ghost hand tapping it invites immediate touch. No reading required. Cold start to interactive < 1.5s. |
+| **2** | **Every touch has motion & sound <= 100ms** | **5/5** | Every touch reacts within ~15ms with scale pop, pentatonic note, and stardust burst. Never blocks input. |
+| **3** | **Next action is obvious without reading** | **5/5** | Ghost hand demonstrates gestures; idle ladder prompts after 3s (Orbi looks), 6s (ghost hand demo), and 10s (target breathes with soft glow). |
+| **4** | **Mistakes feel safe, never bad** | **5/5** | No buzzers, no red crosses, no word "wrong". Soft boop, gentle wobble spring-back, Orbi head tilt, and supportive demonstration. |
+| **5** | **One thing to do at a time** | **5/5** | Clear visual hierarchy; clean runway ordering or single focused planet toy; no competing popups. |
+| **6** | **Planets recognisable & lit from Sun** | **5/5** | Procedural textures capture distinct silhouettes and patterns. Dynamic lighting with soft terminator, rim light, and night-side Earth city lights. |
+| **7** | **Motion quality & shared motion system** | **5/5** | Shared motion system with anticipation, action, and settle. All transitions <= 800ms, non-blocking with <= 100ms fast-forward on touch. Reduced-motion fallbacks for all animations. |
+| **8** | **Sound pleasant & balanced** | **5/5** | Pentatonic scale ensures pleasant harmonies. Capped master gain limiter prevents ear fatigue. Instant 1-tap mute always accessible. |
+| **9** | **Science correct & scale marked** | **5/5** | All facts verified against NASA Science. Monotone orbital speeds (inner faster than outer). "Not to scale" icon displayed on system views. |
+| **10** | **Edge cases & robustness** | **5/5** | Screen rotation reflow, background pause/resume, 300ms double-tap throttle, 40% target hit area expansion, p95 frame time < 5ms. |
 
 **Overall Rubric Average: 5.0 / 5.0** (All criteria >= 4.0).

@@ -1,6 +1,9 @@
 /**
  * 3-Step Gentle Hint Ladder (js/systems/hints.js).
  * Never says "wrong", keeps learning safe, gentle, and informative.
+ * - Miss 1: gentle boop, wobble, Orbi tilts head, demonstration replays
+ * - Miss 2: demonstration replays slower, correct target breathes with soft glow
+ * - Miss 3: Orbi co-play (Orbi & ghost hand place it together)
  */
 import { audio } from '../core/audio.js';
 import { voice } from '../core/voice.js';
@@ -8,14 +11,22 @@ import { voice } from '../core/voice.js';
 export class HintLadder {
   constructor() {
     this.missCount = 0;
+    this.glowTarget = false;
+    this.correctTargetId = null;
   }
 
   reset() {
     this.missCount = 0;
+    this.glowTarget = false;
+    this.correctTargetId = null;
   }
 
   get currentLevel() {
     return Math.min(3, this.missCount);
+  }
+
+  get level() {
+    return this.currentLevel;
   }
 
   /**
@@ -25,12 +36,14 @@ export class HintLadder {
    */
   handleMiss(context = {}) {
     this.missCount += 1;
-    const level = this.currentLevel;
+    const lvl = this.currentLevel;
+    this.correctTargetId = context.correctSlotId || context.targetId || null;
+    this.glowTarget = (lvl >= 2);
 
     // Always gentle boop sound
     audio.playBoop();
 
-    if (level === 1) {
+    if (lvl === 1) {
       voice.speak('hints.level1');
       return {
         level: 1,
@@ -39,7 +52,7 @@ export class HintLadder {
         autoSolve: false,
         wobbleTargetId: context.targetId
       };
-    } else if (level === 2) {
+    } else if (lvl === 2) {
       voice.speak('hints.level2');
       return {
         level: 2,
@@ -60,6 +73,10 @@ export class HintLadder {
         targetId: context.targetId
       };
     }
+  }
+
+  recordMiss(correctSlotId) {
+    return this.handleMiss({ correctSlotId });
   }
 }
 

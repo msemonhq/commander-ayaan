@@ -11,3 +11,8 @@ This log records decisions made during development. Format: one line per decisio
 - 2026-10-03: Removed INTERNET permission from AndroidManifest.xml entirely to strictly guarantee zero network calls and child data safety offline.
 - 2026-10-03: Bundled local OFL Nunito woff2 font in www/assets/fonts/ to eliminate external font dependencies and guarantee offline typography.
 - 2026-10-03: Touch target hit areas padded by 40% beyond visible graphics, paired with a 300ms double-tap guard to protect early-reader input.
+- 2026-10-04: Implemented wordless ghost hand (`hand.js`) and coach idle ladder (`coach.js`) to eliminate on-screen text instructions and teach through tactile demonstration.
+- 2026-10-04: Designed Sun-directed lighting engine (`lighting.js`) providing soft day/night terminators, rim highlights, atmosphere glows, and Earth night-side city lights.
+- 2026-10-04: Created shared motion system (`tween.js`, `tokens.css`, `transition.js`) with non-blocking screen transitions that fast-forward within <= 100ms upon touch.
+- 2026-10-04: Replaced text door labels in Hub with live animated procedural canvas previews (spinning planet toy and hopping runway).
+- 2026-10-04: Replaced Meet the Planets with Planet Playground (`playground.js`), turning all 8 planets and the Sun into signature physical toys with true astronomical demos.

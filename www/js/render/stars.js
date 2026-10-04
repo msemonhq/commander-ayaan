@@ -1,19 +1,25 @@
 /**
- * 3-Layer Parallax Starfield (js/render/stars.js).
- * Drifts slowly upward to provide a gentle zero-gravity sensation.
+ * 3-Layer Parallax Starfield & Deep Space Background (js/render/stars.js).
+ * Includes:
+ * - Faint ethereal nebula layers
+ * - Distant dust particles
+ * - 3 parallax star layers drifting slowly upward
+ * - Calm zero-gravity feeling, respects reduce-motion
  */
 import { RNG, rng } from '../core/rng.js';
 
 export class Starfield {
   constructor() {
     this.layers = [
-      { count: 60, speed: 4, size: 1.2, minAlpha: 0.25, maxAlpha: 0.55, stars: [] },
-      { count: 35, speed: 8, size: 2.0, minAlpha: 0.45, maxAlpha: 0.75, stars: [] },
-      { count: 18, speed: 15, size: 2.8, minAlpha: 0.65, maxAlpha: 0.95, stars: [] }
+      { count: 65, speed: 3.5, size: 1.1, minAlpha: 0.2, maxAlpha: 0.5, stars: [] },
+      { count: 35, speed: 7.5, size: 1.9, minAlpha: 0.4, maxAlpha: 0.7, stars: [] },
+      { count: 18, speed: 14.0, size: 2.6, minAlpha: 0.6, maxAlpha: 0.95, stars: [] }
     ];
+    this.dust = [];
     this.width = 800;
     this.height = 600;
     this.initialized = false;
+    this.nebulaOffset = 0;
   }
 
   init(width, height) {
@@ -29,12 +35,25 @@ export class Starfield {
           x: starRng.next() * width,
           y: starRng.next() * height,
           alpha: layer.minAlpha + starRng.next() * (layer.maxAlpha - layer.minAlpha),
-          twinkleSpeed: 1.0 + starRng.next() * 2.0,
+          twinkleSpeed: 0.8 + starRng.next() * 1.5,
           twinklePhase: starRng.next() * Math.PI * 2,
           isGold: starRng.next() > 0.85
         });
       }
     }
+
+    // Distant cosmic dust
+    this.dust = [];
+    for (let i = 0; i < 25; i++) {
+      this.dust.push({
+        x: starRng.next() * width,
+        y: starRng.next() * height,
+        radius: 12 + starRng.next() * 24,
+        alpha: 0.03 + starRng.next() * 0.05,
+        speed: 1.5 + starRng.next() * 2.5
+      });
+    }
+
     this.initialized = true;
   }
 
@@ -48,7 +67,9 @@ export class Starfield {
   }
 
   update(dt, reduceMotion = false) {
-    if (reduceMotion) return; // Honour OS / app reduce motion setting
+    if (reduceMotion) return;
+
+    this.nebulaOffset += dt * 1.2;
 
     for (const layer of this.layers) {
       const dy = layer.speed * dt;
@@ -61,34 +82,57 @@ export class Starfield {
         s.twinklePhase += s.twinkleSpeed * dt;
       }
     }
+
+    for (const d of this.dust) {
+      d.y -= d.speed * dt;
+      if (d.y < -d.radius) {
+        d.y = this.height + d.radius;
+        d.x = rng.next() * this.width;
+      }
+    }
   }
 
   render(ctx) {
+    if (!this.initialized) return;
+
     ctx.save();
-    for (let l = 0; l < this.layers.length; l++) {
-      const layer = this.layers[l];
+
+    // 1. Faint cosmic nebula cloud
+    const nebulaGrad = ctx.createRadialGradient(
+      this.width * 0.35,
+      (this.height * 0.45 - (this.nebulaOffset % this.height) + this.height) % this.height,
+      50,
+      this.width * 0.35,
+      this.height * 0.45,
+      this.width * 0.7
+    );
+    nebulaGrad.addColorStop(0, 'rgba(43, 58, 168, 0.12)');
+    nebulaGrad.addColorStop(0.5, 'rgba(24, 32, 82, 0.06)');
+    nebulaGrad.addColorStop(1, 'rgba(10, 13, 36, 0)');
+    ctx.fillStyle = nebulaGrad;
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    // 2. Distant cosmic dust
+    for (const d of this.dust) {
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(112, 214, 255, ${d.alpha})`;
+      ctx.fill();
+    }
+
+    // 3. Parallax star layers
+    for (const layer of this.layers) {
       for (const s of layer.stars) {
-        const twinkle = Math.sin(s.twinklePhase) * 0.2;
-        const alpha = Math.max(0.1, Math.min(1.0, s.alpha + twinkle));
+        const twinkle = Math.sin(s.twinklePhase) * 0.25;
+        const curAlpha = Math.max(0.1, Math.min(1.0, s.alpha + twinkle));
 
-        ctx.fillStyle = s.isGold ? `rgba(255, 224, 130, ${alpha})` : `rgba(220, 230, 255, ${alpha})`;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, layer.size * 0.5, 0, Math.PI * 2);
+        ctx.arc(s.x, s.y, layer.size, 0, Math.PI * 2);
+        ctx.fillStyle = s.isGold ? `rgba(255, 224, 130, ${curAlpha})` : `rgba(255, 255, 255, ${curAlpha})`;
         ctx.fill();
-
-        // Near layer gets subtle 4-point twinkle sparkle
-        if (l === 2 && alpha > 0.75) {
-          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.4})`;
-          ctx.lineWidth = 0.75;
-          ctx.beginPath();
-          ctx.moveTo(s.x - 4, s.y);
-          ctx.lineTo(s.x + 4, s.y);
-          ctx.moveTo(s.x, s.y - 4);
-          ctx.lineTo(s.x, s.y + 4);
-          ctx.stroke();
-        }
       }
     }
+
     ctx.restore();
   }
 }

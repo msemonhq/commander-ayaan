@@ -8,15 +8,18 @@
     "note": "G3",
     "freq": 196.00,
     "radius_ratio": 2.2,
+    "demo": "hold_light_fill_earths",
     "facts": [
       {
         "key": "sun_star",
+        "demo": "hold_light_swell",
         "text_key": "planet.sun.fact1",
         "source_url": "https://science.nasa.gov/sun/facts/",
         "verified": true
       },
       {
-        "key": "sun_mass",
+        "key": "sun_volume",
+        "demo": "stream_tiny_earths",
         "text_key": "planet.sun.fact2",
         "source_url": "https://science.nasa.gov/sun/facts/",
         "verified": true
@@ -33,15 +36,18 @@
     "freq": 261.63,
     "radius_ratio": 0.45,
     "orbit_index": 1,
+    "demo": "flick_fast_lap",
     "facts": [
       {
         "key": "mercury_smallest",
+        "demo": "compare_silhouette",
         "text_key": "planet.mercury.fact1",
         "source_url": "https://science.nasa.gov/mercury/facts/",
         "verified": true
       },
       {
         "key": "mercury_year",
+        "demo": "four_laps_dot_ring",
         "text_key": "planet.mercury.fact2",
         "source_url": "https://science.nasa.gov/mercury/facts/",
         "verified": true
@@ -58,15 +64,18 @@
     "freq": 293.66,
     "radius_ratio": 0.75,
     "orbit_index": 2,
+    "demo": "drag_backwards_spin",
     "facts": [
       {
         "key": "venus_backwards",
+        "demo": "spin_reverse_arrows",
         "text_key": "planet.venus.fact1",
         "source_url": "https://science.nasa.gov/venus/venus-facts/",
         "verified": true
       },
       {
         "key": "venus_hottest",
+        "demo": "thick_trapped_heat_glow",
         "text_key": "planet.venus.fact2",
         "source_url": "https://science.nasa.gov/venus/venus-facts/",
         "verified": true
@@ -83,15 +92,18 @@
     "freq": 329.63,
     "radius_ratio": 0.82,
     "orbit_index": 3,
+    "demo": "drag_turn_city_lights_moon",
     "facts": [
       {
         "key": "earth_life",
+        "demo": "blue_oceans_green_continents",
         "text_key": "planet.earth.fact1",
         "source_url": "https://science.nasa.gov/earth/facts/",
         "verified": true
       },
       {
         "key": "earth_moon",
+        "demo": "orbit_grey_moon",
         "text_key": "planet.earth.fact2",
         "source_url": "https://science.nasa.gov/earth/facts/",
         "verified": true
@@ -108,15 +120,18 @@
     "freq": 392.00,
     "radius_ratio": 0.60,
     "orbit_index": 4,
+    "demo": "hold_dust_storm",
     "facts": [
       {
         "key": "mars_rusty",
+        "demo": "swirling_rust_dust_tint",
         "text_key": "planet.mars.fact1",
         "source_url": "https://science.nasa.gov/mars/facts/",
         "verified": true
       },
       {
         "key": "mars_volcano",
+        "demo": "olympus_mons_silhouette",
         "text_key": "planet.mars.fact2",
         "source_url": "https://science.nasa.gov/mars/facts/",
         "verified": true
@@ -133,15 +148,18 @@
     "freq": 440.00,
     "radius_ratio": 1.55,
     "orbit_index": 5,
+    "demo": "swirl_bands_11_earths",
     "facts": [
       {
         "key": "jupiter_biggest",
+        "demo": "eleven_earths_lined_up",
         "text_key": "planet.jupiter.fact1",
         "source_url": "https://science.nasa.gov/jupiter/facts/",
         "verified": true
       },
       {
         "key": "jupiter_storm",
+        "demo": "spinning_red_spot",
         "text_key": "planet.jupiter.fact2",
         "source_url": "https://science.nasa.gov/jupiter/facts/",
         "verified": true
@@ -159,15 +177,18 @@
     "radius_ratio": 1.25,
     "has_ring": true,
     "orbit_index": 6,
+    "demo": "tilt_wobble_ring_sparkles",
     "facts": [
       {
         "key": "saturn_rings",
+        "demo": "tilted_ice_rings_sparkle",
         "text_key": "planet.saturn.fact1",
         "source_url": "https://science.nasa.gov/saturn/facts/",
         "verified": true
       },
       {
         "key": "saturn_light",
+        "demo": "soft_ring_shadow_cast",
         "text_key": "planet.saturn.fact2",
         "source_url": "https://science.nasa.gov/saturn/facts/",
         "verified": true
@@ -185,15 +206,18 @@
     "radius_ratio": 1.05,
     "tilted": true,
     "orbit_index": 7,
+    "demo": "roll_onto_side",
     "facts": [
       {
         "key": "uranus_side",
+        "demo": "tilted_vertical_ring_roll",
         "text_key": "planet.uranus.fact1",
         "source_url": "https://science.nasa.gov/uranus/facts/",
         "verified": true
       },
       {
         "key": "uranus_ice",
+        "demo": "pale_cyan_atmosphere",
         "text_key": "planet.uranus.fact2",
         "source_url": "https://science.nasa.gov/uranus/facts/",
         "verified": true
@@ -210,15 +234,18 @@
     "freq": 659.25,
     "radius_ratio": 1.02,
     "orbit_index": 8,
+    "demo": "sweep_wind_streaks",
     "facts": [
       {
         "key": "neptune_farthest",
+        "demo": "deep_blue_distant_dim",
         "text_key": "planet.neptune.fact1",
         "source_url": "https://science.nasa.gov/neptune/facts/",
         "verified": true
       },
       {
         "key": "neptune_windy",
+        "demo": "supersonic_wind_streaks_race",
         "text_key": "planet.neptune.fact2",
         "source_url": "https://science.nasa.gov/neptune/facts/",
         "verified": true

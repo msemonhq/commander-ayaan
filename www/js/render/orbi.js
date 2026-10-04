@@ -1,7 +1,8 @@
 /**
  * Procedural Orbi Companion Robot (js/render/orbi.js).
  * Original friendly floating robot with expressive digital eyes.
- * Poses: idle, point, cheer, think, sleepy.
+ * Poses: idle, point, nod, shrug, puzzled, cheer, sleepy, look-at-target.
+ * Follows target position within 150ms for natural curiosity.
  */
 
 export class OrbiRenderer {
@@ -9,12 +10,32 @@ export class OrbiRenderer {
     this.floatPhase = 0;
     this.blinkTimer = 0;
     this.isBlinking = false;
+    this.targetGazeX = 0;
+    this.targetGazeY = 0;
+    this.currentGazeX = 0;
+    this.currentGazeY = 0;
+    this.nodPhase = 0;
+  }
+
+  setGazeTarget(tx, ty, orbiX, orbiY) {
+    const dx = tx - orbiX;
+    const dy = ty - orbiY;
+    const angle = Math.atan2(dy, dx);
+    const dist = Math.min(1, Math.hypot(dx, dy) / 200);
+    this.targetGazeX = Math.cos(angle) * 4 * dist;
+    this.targetGazeY = Math.sin(angle) * 3 * dist;
   }
 
   update(dt, reduceMotion = false) {
     if (!reduceMotion) {
       this.floatPhase += dt * 2.2; // Float bob period ~2.8s
     }
+    this.nodPhase += dt * 6.0;
+
+    // Smooth gaze tracking (150ms lag)
+    this.currentGazeX += (this.targetGazeX - this.currentGazeX) * Math.min(1.0, dt * 8);
+    this.currentGazeY += (this.targetGazeY - this.currentGazeY) * Math.min(1.0, dt * 8);
+
     this.blinkTimer += dt;
     if (this.blinkTimer > 3.5) {
       this.isBlinking = true;
@@ -27,8 +48,19 @@ export class OrbiRenderer {
 
   render(ctx, x, y, size = 64, pose = 'idle', reduceMotion = false) {
     ctx.save();
-    const bob = reduceMotion ? 0 : Math.sin(this.floatPhase) * 6;
+    let bob = reduceMotion ? 0 : Math.sin(this.floatPhase) * 6;
+    let tilt = 0;
+
+    if (pose === 'nod') {
+      bob += Math.sin(this.nodPhase) * 4;
+    } else if (pose === 'puzzled') {
+      tilt = 0.18; // Head tilt when puzzled
+    } else if (pose === 'shrug') {
+      bob -= 3;
+    }
+
     ctx.translate(x, y + bob);
+    ctx.rotate(tilt);
 
     const s = size / 64; // Scale factor
 
@@ -46,7 +78,7 @@ export class OrbiRenderer {
     ctx.lineWidth = 3 * s;
     ctx.beginPath();
     ctx.moveTo(0, -22 * s);
-    ctx.lineTo(0, -32 * s);
+    ctx.lineTo(pose === 'puzzled' ? 6 * s : 0, -32 * s);
     ctx.stroke();
 
     // Antenna glowing tip
@@ -54,7 +86,7 @@ export class OrbiRenderer {
     ctx.shadowColor = '#70D6FF';
     ctx.shadowBlur = 8 * s;
     ctx.beginPath();
-    ctx.arc(0, -33 * s, 4.5 * s, 0, Math.PI * 2);
+    ctx.arc(pose === 'puzzled' ? 6 * s : 0, -33 * s, 4.5 * s, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
 
@@ -120,21 +152,31 @@ export class OrbiRenderer {
       ctx.beginPath();
       ctx.arc(7 * s, -5 * s, 4 * s, 0.2, Math.PI - 0.2);
       ctx.stroke();
-    } else if (pose === 'think') {
-      // Looking up and to side
+    } else if (pose === 'puzzled') {
+      // One eye wide, one eye squinted (o . )
       ctx.beginPath();
-      ctx.ellipse(-6 * s, -7 * s, 3.5 * s, 4 * s, 0, 0, Math.PI * 2);
+      ctx.ellipse(-7 * s, -4 * s, 4.5 * s, 5 * s, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.ellipse(8 * s, -7 * s, 3.5 * s, 4 * s, 0, 0, Math.PI * 2);
+      ctx.ellipse(7 * s, -4 * s, 2.5 * s, 3 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (pose === 'look-at-target') {
+      // Eyes shift toward target
+      const gx = this.currentGazeX * s;
+      const gy = this.currentGazeY * s;
+      ctx.beginPath();
+      ctx.ellipse((-7 * s) + gx, (-4 * s) + gy, 3.8 * s, 4.5 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse((7 * s) + gx, (-4 * s) + gy, 3.8 * s, 4.5 * s, 0, 0, Math.PI * 2);
       ctx.fill();
     } else if (pose === 'point') {
-      // Focused eyes looking towards side
+      // Focused eyes looking towards point direction
       ctx.beginPath();
-      ctx.ellipse(-5 * s, -4 * s, 4 * s, 4 * s, 0, 0, Math.PI * 2);
+      ctx.ellipse(-4 * s, -4 * s, 4 * s, 4 * s, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.ellipse(8 * s, -4 * s, 4 * s, 4 * s, 0, 0, Math.PI * 2);
+      ctx.ellipse(9 * s, -4 * s, 4 * s, 4 * s, 0, 0, Math.PI * 2);
       ctx.fill();
     } else {
       // Idle friendly round eyes
@@ -170,7 +212,17 @@ export class OrbiRenderer {
       ctx.stroke();
       ctx.beginPath();
       ctx.moveTo(22 * s, 4 * s);
-      ctx.lineTo(34 * s, -2 * s);
+      ctx.lineTo(36 * s, -4 * s);
+      ctx.stroke();
+    } else if (pose === 'shrug') {
+      // Both arms bent up and outwards
+      ctx.beginPath();
+      ctx.moveTo(-22 * s, 4 * s);
+      ctx.lineTo(-32 * s, -2 * s);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(22 * s, 4 * s);
+      ctx.lineTo(32 * s, -2 * s);
       ctx.stroke();
     } else {
       // Idle relaxed arms at side
